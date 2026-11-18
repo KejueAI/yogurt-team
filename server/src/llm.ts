@@ -18,11 +18,24 @@ export const chatRequestSchema = z.object({
 })
 export type ChatRequest = z.infer<typeof chatRequestSchema>
 
-export function openRouterBody(req: ChatRequest, model: string): Record<string, unknown> {
+/** Extra room for models that must think before answering, so the thinking can't use up the answer's tokens */
+export const REASONING_HEADROOM = 4096
+
+/**
+ * The app's token limits are sized for the answer alone. Thinking is turned off so it can't spend them; a model that
+ * cannot answer without thinking is asked again (see callOpenRouter) with low effort and room for it.
+ */
+export function openRouterBody(req: ChatRequest, model: string, mustReason = false): Record<string, unknown> {
   const body: Record<string, unknown> = { model, messages: req.messages, stream: true }
-  if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens
+  body.reasoning = mustReason ? { effort: 'low', exclude: true } : { enabled: false }
+  if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens + (mustReason ? REASONING_HEADROOM : 0)
   if (req.temperature !== undefined) body.temperature = req.temperature
   return body
+}
+
+/** OpenRouter's answer when a model's endpoint refuses to turn thinking off */
+export function reasoningIsMandatory(status: number, text: string): boolean {
+  return status === 400 && /reasoning/i.test(text) && /mandatory|required|cannot be disabled/i.test(text)
 }
 
 export async function callOpenRouter(opts: {
@@ -33,18 +46,24 @@ export async function callOpenRouter(opts: {
   signal?: AbortSignal
   fetchImpl?: Fetch
 }): Promise<Response> {
-  return (opts.fetchImpl ?? fetch)(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${opts.apiKey}`,
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      'HTTP-Referer': opts.referer,
-      'X-Title': 'Yogurt Team',
-    },
-    body: JSON.stringify(openRouterBody(opts.request, opts.model)),
-    signal: opts.signal,
-  })
+  const send = (mustReason: boolean) =>
+    (opts.fetchImpl ?? fetch)(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${opts.apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        'HTTP-Referer': opts.referer,
+        'X-Title': 'Yogurt Team',
+      },
+      body: JSON.stringify(openRouterBody(opts.request, opts.model, mustReason)),
+      signal: opts.signal,
+    })
+  const res = await send(false)
+  if (res.status !== 400) return res
+  const text = await res.text()
+  if (reasoningIsMandatory(res.status, text)) return send(true)
+  return new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers })
 }
 
 export function sse(payload: object): string {

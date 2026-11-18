@@ -80,7 +80,7 @@ docker run --rm -p 8080:8080 --env-file .env -e DATABASE_URL=postgres://postgres
 | `ADMIN_EMAILS` | no | Comma-separated emails that are always admins and can always sign in. Set at least one for the first sign-in. |
 | `ALLOWED_DOMAINS` | no | Comma-separated Google Workspace domains allowed to sign in. Admins can change this in the admin UI (the UI value wins once saved). |
 | `OPENROUTER_API_KEY` | no | Fallback OpenRouter key. A key set in the admin UI takes precedence. |
-| `OPENROUTER_MODEL` | no | Fallback model, default `openrouter/auto`. The admin UI value wins. |
+| `OPENROUTER_MODEL` | no | Fallback model, default `deepseek/deepseek-v4.1-flash`. The admin UI value wins. Thinking is turned off so the app's token limits go to the answer; models that require thinking are retried with low effort. |
 | `PORT` | no | HTTP port, default `8080`. |
 
 Access rule: a Google account may sign in if its email is verified, it isn't blocked, and it is in `ADMIN_EMAILS`, in the allowlist, or on an allowed domain.

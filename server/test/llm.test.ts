@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { OPENROUTER_URL, callOpenRouter, chatRequestSchema, openRouterBody, reemit, sse } from '../src/llm.js'
+import { OPENROUTER_URL, REASONING_HEADROOM, callOpenRouter, chatRequestSchema, openRouterBody, reemit, sse } from '../src/llm.js'
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder()
@@ -83,9 +83,34 @@ describe('OpenRouter request', () => {
       model: 'anthropic/claude-sonnet-4.5',
       messages: [{ role: 'user', content: 'hi' }],
       stream: true,
+      reasoning: { enabled: false },
       max_tokens: 500,
       temperature: 0.2,
     })
+    expect(openRouterBody(req, 'm', true)).toMatchObject({ reasoning: { effort: 'low', exclude: true }, max_tokens: 500 + REASONING_HEADROOM })
+  })
+
+  it('asks again with low-effort thinking when a model cannot turn it off', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400}}', { status: 400 }))
+      .mockResolvedValueOnce(new Response('data: [DONE]', { status: 200 }))
+    const request = chatRequestSchema.parse({ messages: [{ role: 'user', content: 'hi' }], maxTokens: 100 })
+    const res = await callOpenRouter({ apiKey: 'k', model: 'm', request, referer: 'https://x', fetchImpl })
+    expect(res.status).toBe(200)
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    const second = JSON.parse((fetchImpl.mock.calls[1] as [string, RequestInit])[1].body as string)
+    expect(second.reasoning).toEqual({ effort: 'low', exclude: true })
+    expect(second.max_tokens).toBe(100 + REASONING_HEADROOM)
+  })
+
+  it('passes other 400s through unchanged', async () => {
+    const fetchImpl = vi.fn(async () => new Response('{"error":{"message":"bad model"}}', { status: 400 }))
+    const request = chatRequestSchema.parse({ messages: [{ role: 'user', content: 'hi' }] })
+    const res = await callOpenRouter({ apiKey: 'k', model: 'm', request, referer: 'https://x', fetchImpl })
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('bad model')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
   it('posts to OpenRouter with the key and attribution headers', async () => {

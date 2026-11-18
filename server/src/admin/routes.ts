@@ -438,7 +438,7 @@ export function adminRoutes(deps: Deps): Hono<Env> {
   <form method="post" action="/admin/summaries/model">
     <label for="model">OpenRouter model</label>
     <input id="model" type="text" name="model" value="${s.openrouterModel ?? ''}" placeholder="${deps.config.openrouterModel || DEFAULT_MODEL}">
-    <div class="hint">For example <code>anthropic/claude-sonnet-4.5</code> or <code>google/gemini-2.5-flash</code>. Leave empty for ${deps.config.openrouterModel ? html`<code>OPENROUTER_MODEL</code> (${deps.config.openrouterModel})` : html`<code>${DEFAULT_MODEL}</code>`}. In use: <code>${or.model}</code>.</div>
+    <div class="hint">For example <code>deepseek/deepseek-v4.1-flash</code> (cheap, open weights), <code>anthropic/claude-haiku-5.5</code> or <code>anthropic/claude-sonnet-5.5</code>. Leave empty for ${deps.config.openrouterModel ? html`<code>OPENROUTER_MODEL</code> (${deps.config.openrouterModel})` : html`<code>${DEFAULT_MODEL}</code>`}. In use: <code>${or.model}</code>.</div>
     <div class="actions"><button class="primary" type="submit">Save model</button></div>
   </form>
 </section>`
