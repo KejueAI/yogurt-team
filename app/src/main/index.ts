@@ -82,6 +82,7 @@ import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt }
 import { helperDecode, wavDecode } from './asr/backfill'
 import { finishQuit, hookUpdates, isPreviewBuild, updatesOn } from './updates'
 import type { NoteSaveResult, StartResult } from '../shared/types'
+import { hookTeam } from './team'
 
 // the transcript's player streams each meeting's audio from here; seeking needs stream support (before ready)
 protocol.registerSchemesAsPrivileged([{ scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
@@ -630,8 +631,10 @@ app.whenReady().then(() => {
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
+  // Yogurt Team: uploads summarized meetings; the automatic recording deletion waits for the audio upload
+  const team = hookTeam({ userDataDir: userDataDir(), store, dirOf: id => join(userDataDir(), 'meetings', id), audioKinds: () => audioKinds, removeRecording: id => removeRecording(id, true), window: () => win })
   const notes = hookNotes({
-    summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
+    summarized: id => { folderSuggestions.schedule(id); team.summarized(id) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
     summaryLanguage: () => summaryLanguageSetting(loadSettings(settingsFile)),
