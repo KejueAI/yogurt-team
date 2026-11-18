@@ -14,6 +14,7 @@ import { osWords } from '../keys'
 import { Modal, ModalClose } from '../components/Modal'
 import { NotesModelWait } from '../components/NotesModelWait'
 import { SummaryWaiting } from '../components/SummaryWaiting'
+import { TeamSignInNeeded } from '../team/TeamSignInNeeded'
 import { Editor } from '../components/Editor'
 import { mergeNoteView } from '../noteMerge'
 import { Transcript } from '../components/Transcript'
@@ -536,6 +537,7 @@ function Enhanced({ notes, presentation, disabled, onChange, onBlur, onRetry, fo
       <NotesModelWait downloading={(percent) => (
         <p data-testid="note-enhanced-model-download" role="status" className="text-[15px] text-muted">{t("Your summary is waiting for Yogurt's AI to download.")} {percent && <span className="whitespace-nowrap">{percent}</span>}</p>
       )}>
+        <TeamSignInNeeded />
         <SummaryWaiting part={status === 'writing' ? notes.part : undefined} />
       </NotesModelWait>
     )

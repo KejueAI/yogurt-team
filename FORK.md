@@ -26,7 +26,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `.github/workflows/release.yml` | Top-level env `MAIN_VITE_YOGURT_TEAM_SERVER` from repo variable `YOGURT_TEAM_SERVER`; `Yogurt Team.app` paths; repo variable `ALLOW_UNSIGNED_MAC=true` allows pilot releases without Apple secrets; without a certificate the Mac app is ad-hoc signed with hardened runtime off |
 | `app/src/preload/index.ts` | `import './team'`, which exposes `window.yogurtTeam` |
 | `app/src/renderer/src/screens/Settings.tsx` | `<TeamSettings />` section |
-| `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row |
+| `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row; `<TeamSignInNeeded />` above a summary waiting on sign-in |
 | `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts`, `llm.ts` |
 | `app/src/main/notes/enhance.ts` | Optional `Llm.partTokens` so the cloud model (team/llm.ts) splits long meetings into bigger parts |
 | `app/src/main/setup.ts` | `remoteNotes` dep: when the team server writes notes, skip the notes model download (speech and embedding still download); `startLocalNotes()` resumes it |
