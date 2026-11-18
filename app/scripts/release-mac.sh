@@ -75,7 +75,7 @@ DMG=dist/Yogurt-mac-arm64.dmg
 verify_identity "$DMG"
 if [ "$LOCAL" = 1 ]; then
   [ ! -e "$APP/Contents/Resources/app-update.yml" ] || { echo 'Local builds must not have a release feed' >&2; exit 1; }
-  [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = so.yogurt.app ] || exit 1
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = co.kejue.yogurtteam ] || exit 1
 
 fi
 if [ "${YOGURT_NOTARIZE:-1}" = 0 ]; then

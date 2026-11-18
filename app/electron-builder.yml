@@ -1,13 +1,13 @@
-appId: so.yogurt.app
-productName: Yogurt
+appId: co.kejue.yogurtteam
+productName: Yogurt Team
 copyright: Copyright © 2026 Frigade
 # GitHub Releases: every v* tag builds Mac, Windows and Linux (.github/workflows/release.yml).
 # Fixed file names, so releases/latest/download/Yogurt-mac-arm64.dmg (and the Windows and Linux ones) point at the newest.
 # Installed copies update from the same release (latest-mac.yml, latest.yml, latest-linux.yml; src/main/updates.ts).
 publish:
   provider: github
-  owner: FrigadeHQ
-  repo: yogurt
+  owner: Youssef-Abdelsalam-2005
+  repo: yogurt-team
   releaseType: release
 extraMetadata:
   name: yogurt
@@ -80,10 +80,10 @@ mac:
   extendInfo:
     # a Dock app, with its menu bar icon too
     LSUIElement: false
-    NSMicrophoneUsageDescription: Yogurt records your voice in meetings so it can write the transcript and your notes. Nothing leaves your Mac.
-    NSAudioCaptureUsageDescription: Yogurt records the sound of your calls so it can write down what others say. Nothing leaves your Mac.
-    NSCalendarsFullAccessUsageDescription: Yogurt reads your calendar to name your notes after the meeting and to know who is in it. Nothing leaves your Mac.
-    NSCalendarsUsageDescription: Yogurt reads your calendar to name your notes after the meeting and to know who is in it. Nothing leaves your Mac.
+    NSMicrophoneUsageDescription: Yogurt records your voice in meetings so it can write the transcript and your notes. Recordings, transcripts and notes are shared with your team unless you mark a meeting private.
+    NSAudioCaptureUsageDescription: Yogurt records the sound of your calls so it can write down what others say. Recordings, transcripts and notes are shared with your team unless you mark a meeting private.
+    NSCalendarsFullAccessUsageDescription: Yogurt reads your calendar to name your notes after the meeting and to know who is in it. Meeting names and attendees are shared with your team unless you mark a meeting private.
+    NSCalendarsUsageDescription: Yogurt reads your calendar to name your notes after the meeting and to know who is in it. Meeting names and attendees are shared with your team unless you mark a meeting private.
     NSAppleEventsUsageDescription: Yogurt checks the browser tab's name to tell when you're in a call, and pauses your music while it records.
     # Electron's own defaults ("This app needs access to..."): Yogurt never asks for these, so plain words instead
     NSCameraUsageDescription: Yogurt doesn't use the camera.
@@ -107,6 +107,8 @@ win:
     # the tray's colour icons (tray.ts; @2x next to them), a Mac uses its template tray.png
     - { from: resources, to: ., filter: ["tray-color*.png", "tray-recording*.png"] }
   artifactName: Yogurt-windows-${arch}.${ext}
+  # Yogurt Team: the program keeps upstream's file name, so call detection (detect.ts) and the workflows need no change
+  executableName: Yogurt
   target:
     - target: nsis
       arch: [x64]
@@ -143,7 +145,7 @@ linux:
   icon: build/icons
   category: Office
 dmg:
-  title: Yogurt
+  title: Yogurt Team
   # build/background.png (+ @2x), from build/dmg-background.svg
   background: build/background.png
   iconSize: 128
