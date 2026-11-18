@@ -32,6 +32,8 @@ export type SetupDeps = {
   upgradePreference?: { load(): boolean; save(skipped: boolean): void }
   /** Windows and Linux: the speed check picks the speech model (a Mac never has it: turbo, as always) */
   speed?: SpeedDeps
+  /** Yogurt Team: notes are written by the team server (team/llm.ts), so the notes model waits until startLocalNotes() */
+  remoteNotes?: () => Promise<boolean>
 }
 
 /** Where the models ended up, for the parts of the app that use them; llm once the first notes model is in (after ready) */
@@ -77,6 +79,8 @@ export class SetupController {
   private embedding: Promise<void> | undefined
   /** Try again after an error: time the speech models again instead of trusting what was stored */
   private recheck = false
+  /** Yogurt Team: the notes model download held back while the team server writes notes */
+  private localNotes: (() => void) | undefined
 
   constructor(private deps: SetupDeps) {}
 
@@ -199,7 +203,7 @@ export class SetupController {
   private async run() {
     this.set({ phase: 'checking', fraction: 0 })
     try {
-      const [hw, catalog] = await Promise.all([this.deps.getHardware(), this.deps.getCatalog()])
+      const [hw, catalog, remote] = await Promise.all([this.deps.getHardware(), this.deps.getCatalog(), this.deps.remoteNotes?.().catch(() => false) ?? false])
       const llm = pick(hw, catalog.models)
       const weak = tooWeak(hw, !!llm.recommended)
       if (!llm.recommended || weak) return this.set({ phase: 'error', fraction: 0, message: weak ?? '' })
@@ -236,7 +240,7 @@ export class SetupController {
       const waitFor: Item[] = [asrItem(speed ? keep ?? candidates[0] : asr.model)]
       const total = waitFor.reduce((n, i) => n + i.bytes, 0)
       // room for the first notes model too, so it never runs out of disk after ready
-      await this.checkDisk([...waitFor, ...(hasUpgrade ? [] : [starterItem]), embedItem])
+      await this.checkDisk([...waitFor, ...(hasUpgrade || remote ? [] : [starterItem]), embedItem])
 
       let done = 0
       const report = (item: Item, fraction: number) => this.set({ phase: 'downloading', fraction: Math.min(1, (done + item.bytes * fraction) / total) })
@@ -270,6 +274,7 @@ export class SetupController {
         this.paths.recommendedLlm = join(bigger!.dir, bigger!.fileName)
         if (isVerified(starterItem.dir, starterItem.fileName, this.sha(starterItem))) this.paths.llm = join(starterItem.dir, starterItem.fileName)
       }
+      if (remote) return this.startRemote(starterItem, embedItem)
       this.set({ phase: 'ready', fraction: 1, notesUpgradeBytes: bigger?.bytes, notesUpgradeSkipped: skipped, notesUpgradeInstalled: hasUpgrade })
       this.startNotes(starterItem, embedItem)
     } catch (err) {
@@ -277,6 +282,26 @@ export class SetupController {
       this.set({ phase: 'error', fraction: this._state.fraction, message: friendly(err) })
     }
   }
+
+  /**
+   * Yogurt Team: ready without a notes model. Notes wait on nothing (the listeners hear "notes model in"), the embedding
+   * model still downloads, and the notes models only download if startLocalNotes() is called (the team server stopped).
+   */
+  private startRemote(first: Item, embed: Item) {
+    console.info('NOTES', 'the team server writes notes: the notes model is not downloaded')
+    this.set({ phase: 'ready', fraction: 1, notesUpgradeInstalled: !!this.paths?.recommendedLlm })
+    this.localNotes = () => {
+      this.localNotes = undefined
+      const embedding = this.background
+      this.set({ ...this._state, notesUpgradeBytes: this.backgroundItem?.bytes, notesUpgradeSkipped: this.deps.upgradePreference?.load() ?? false })
+      this.background = Promise.all([embedding, this.startNotes(first)]).then(() => {})
+    }
+    for (const l of this.notesListeners) { try { l() } catch (e) { console.error('notes model listener failed', e) } }
+    this.background = this.startEmbedding(embed)
+  }
+
+  /** Yogurt Team: the team server stopped writing notes; download the notes models as upstream does (once) */
+  startLocalNotes() { this.localNotes?.() }
 
   /**
    * Windows and Linux: download each speech model in turn and time it on a short clip, until one reads two voices as fast
@@ -305,7 +330,7 @@ export class SetupController {
    * The first notes model downloads while Yogurt already records: it is tried until it lands (meetings recorded
    * meanwhile get their notes then). The bigger one follows.
    */
-  private startNotes(first: Item, embed: Item) {
+  private startNotes(first: Item, embed?: Item) {
     this.background = (async () => {
       const waits = this.deps.notesRetryMs ?? NOTES_RETRY_MS
       // Waiting notes show whole percents; every 10% goes in the log.
@@ -338,8 +363,9 @@ export class SetupController {
       }
       for (const l of this.notesListeners) { try { l() } catch (e) { console.error('notes model listener failed', e) } }
     })()
-    this.background = this.background.then(() => this.startEmbedding(embed))
+    if (embed) this.background = this.background.then(() => this.startEmbedding(embed))
     this.background = this.background.then(() => { if (this.backgroundItem) return this.startBackground(this.backgroundItem) })
+    return this.background
   }
 
   /**
