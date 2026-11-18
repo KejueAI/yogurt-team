@@ -1,6 +1,6 @@
 # Yogurt Team fork notes
 
-Yogurt Team is a permanent fork of [FrigadeHQ/yogurt](https://github.com/FrigadeHQ/yogurt). Upstream changes are merged in daily by `.github/workflows/upstream-sync.yml`, which opens a pull request.
+Yogurt Team is a permanent fork of [FrigadeHQ/yogurt](https://github.com/FrigadeHQ/yogurt). Upstream changes are merged daily by `.github/workflows/upstream-sync.yml` into the `upstream-sync` branch, which opens a pull request (or, where the organization forbids that, an issue linking to one).
 
 To keep merges painless, fork code lives in its own files and folders. When a merge conflicts, the conflict will be in one of the upstream files listed below.
 

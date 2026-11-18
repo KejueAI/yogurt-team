@@ -86,7 +86,7 @@
                   "billing": { "deploymentPlan": "nf-compute-20" },
                   "vcsData": {
                     "projectType": "github",
-                    "projectUrl": "https://github.com/Youssef-Abdelsalam-2005/yogurt-team",
+                    "projectUrl": "https://github.com/KejueAI/yogurt-team",
                     "projectBranch": "${args.GIT_BRANCH}"
                   },
                   "buildSettings": {

@@ -2,7 +2,7 @@
 
 Yogurt Team is a fork of [FrigadeHQ/yogurt](https://github.com/FrigadeHQ/yogurt) that adds a standard team record of meetings. Teammates sign in with Google and record as usual; each meeting's audio, transcript and notes then land in a shared Google Drive folder chosen by an admin.
 
-Status: plan agreed 2026-11-18. The fork exists at `Youssef-Abdelsalam-2005/yogurt-team` with `upstream` pointing at FrigadeHQ/yogurt. Nothing else is built yet.
+Status: plan agreed 2026-11-18. The fork lives at `KejueAI/yogurt-team` (moved from a personal account) with `upstream` pointing at FrigadeHQ/yogurt. Nothing else is built yet.
 
 ## Goals
 

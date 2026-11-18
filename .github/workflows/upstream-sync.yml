@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   sync:
@@ -44,4 +45,12 @@ jobs:
           if [ "${{ steps.merge.outputs.conflict }}" = "true" ]; then
             body="Upstream main conflicts with the fork. This branch is upstream/main alone: merge it locally (git merge upstream/main) and resolve using FORK.md."
           fi
-          gh pr view upstream-sync >/dev/null 2>&1 || gh pr create --head upstream-sync --base main --title "Sync with upstream Yogurt" --body "$body"
+          gh pr view upstream-sync >/dev/null 2>&1 && exit 0
+          gh pr create --head upstream-sync --base main --title "Sync with upstream Yogurt" --body "$body" && exit 0
+          # Organizations can forbid Actions from opening pull requests; fall back to an issue with the compare link
+          link="${{ github.server_url }}/${{ github.repository }}/compare/main...upstream-sync?expand=1"
+          open=$(gh issue list --state open --search "Sync with upstream Yogurt in:title" --json number -q '.[0].number')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "Updated: $link"
+          else gh issue create --title "Sync with upstream Yogurt" --body "$body
+
+Open the pull request: $link"; fi

@@ -113,7 +113,7 @@ You can import `northflank-template.json` (Templates → Import) or set it up by
 1. **Project**: create a project in your preferred region.
 2. **Addon**: add a **PostgreSQL** addon (version 17). Nothing needs to be public.
 3. **Service**: create a **Combined service** (build + deploy):
-   - Repository: `Youssef-Abdelsalam-2005/yogurt-team`, branch `main`.
+   - Repository: `KejueAI/yogurt-team`, branch `main`.
    - Build type **Dockerfile**, build context `/server`, Dockerfile path `/server/Dockerfile`.
    - Port `8080`, protocol HTTP, **public**. Health check: HTTP `GET /healthz` on 8080.
    - Resources: the smallest plan is enough to start.
