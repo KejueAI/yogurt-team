@@ -523,9 +523,13 @@ app.whenReady().then(() => {
   }
   // Yogurt Team: notes, titles and Ask written through the team server when summaries are on there (team/llm.ts)
   const teamNotes = createTeamNotes({ session: teamSession })
-  teamSession.onChange(() => teamNotes.invalidate())
+  // signing in or out: ask the server again now, so queued notes start without waiting for something else to ask
+  teamSession.onChange(() => { teamNotes.invalidate(); void teamNotes.remoteActive(true) })
+  // a server that was slow or down at launch: keep asking each minute, so notes never wait for a model that won't come
+  setInterval(() => { if (teamSession.serverUrl() && !teamNotes.active()) void teamNotes.remoteActive(true) }, 60_000).unref()
   // A team build never downloads the local notes model while a team server is set: notes wait for sign-in instead
-  const setup = createSetup(async () => !!teamSession.serverUrl() || teamNotes.remoteActive())
+  // remoteActive() is always asked (the notes queue reads its answer through teamNotes.active()), and a set server counts as remote either way
+  const setup = createSetup(async () => (await teamNotes.remoteActive().catch(() => false)) || !!teamSession.serverUrl())
   setup.onState((st) => win?.webContents.send('setup:state', st))
   ipcMain.handle('setup:state', () => setup.state)
   ipcMain.handle('setup:retry', () => setup.retry())
