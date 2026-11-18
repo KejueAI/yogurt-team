@@ -9,19 +9,23 @@
  *   the audio is on the server, or until it will not be sent (private, signed out, the team does not take audio).
  * - Making a sent meeting private asks the server to remove it.
  */
-import { createReadStream } from 'node:fs'
+import { createReadStream, mkdtempSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as joinPath } from 'node:path'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import type { AudioExt } from '../audio'
 import type { Store } from '../store'
 import { teamApi, TeamApiError, type CompleteAudio, type Fetch } from './api'
 import { DEFAULT_GRACE_MINUTES } from './config'
-import { attendeeEmails, audioFiles, notesMarkdown, transcriptMarkdown } from './documents'
+import { attendeeEmails, audioFiles, notesMarkdown, transcriptMarkdown, type AudioFile } from './documents'
 import type { TeamSession } from './session'
 import type { TeamFile, UploadEntry } from './teamFile'
 import type { TeamMeetingState } from './types'
 
 export type PutFile = (url: string, path: string, size: number, mimeType: string) => Promise<void>
+
+export type MixAudio = (inputs: string[], out: string) => Promise<void>
 
 export type UploadDeps = {
   file: TeamFile
@@ -33,6 +37,8 @@ export type UploadDeps = {
   removeRecording: (id: string) => unknown
   fetch?: Fetch
   putFile?: PutFile
+  /** mixes tracks that are on meeting time into one file (the audio helper's `mix`); the team's Drive gets only that */
+  mixAudio?: MixAudio
   now?: () => number
   /** the window should look again */
   changed?: (meetingId: string | null) => void
@@ -285,8 +291,31 @@ export class UploadQueue {
     if (!me) return // signed out meanwhile; the change listener lets the entry go
     if (!same()) return
     const team = me.team
-    const audio = team.uploadAudio !== false ? audioFiles(this.d.dirOf(id), this.d.audioKinds) : []
-    if (!audio.length) this.releaseHold(id)
+    const tracks = team.uploadAudio !== false ? audioFiles(this.d.dirOf(id), this.d.audioKinds) : []
+    if (!tracks.length) this.releaseHold(id)
+    // the team gets one recording of the whole meeting: both tracks mixed (a retryable failure if mixing fails)
+    const mixed = tracks.length ? await this.mixed(tracks) : undefined
+    try { await this.send(api, id, m, team, same, mixed ? [mixed.file] : []) } finally { if (mixed) rmSync(mixed.dir, { recursive: true, force: true }) }
+  }
+
+  private async mixed(tracks: AudioFile[]): Promise<{ dir: string; file: AudioFile }> {
+    const mix = this.d.mixAudio
+    if (!mix) throw new UploadFailed('this computer cannot mix the recording', false)
+    const ext = tracks[0].path.slice(tracks[0].path.lastIndexOf('.') + 1)
+    const dir = mkdtempSync(joinPath(tmpdir(), 'yogurt-team-mix-'))
+    const out = joinPath(dir, `recording.${ext}`)
+    try {
+      await mix(tracks.map(t => t.path), out)
+      const size = statSync(out).size
+      if (size <= 0) throw new Error('the mixed recording is empty')
+      return { dir, file: { track: 'recording', fileName: `recording.${ext}`, mimeType: tracks[0].mimeType, size, path: out } }
+    } catch (err) {
+      rmSync(dir, { recursive: true, force: true })
+      throw new UploadFailed(`could not mix the recording: ${err instanceof Error ? err.message : String(err)}`, true)
+    }
+  }
+
+  private async send(api: ReturnType<typeof teamApi>, id: string, m: NonNullable<ReturnType<Store['meeting']>>, team: NonNullable<Awaited<ReturnType<TeamSession['me']>>>['team'], same: () => boolean, audio: AudioFile[]) {
     this.save(id, x => { x.state = 'uploading'; delete x.error })
     const notes = this.d.store.notes(id)
     const startedAt = new Date(m.startedAt).toISOString()

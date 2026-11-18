@@ -3,7 +3,9 @@
  * the session, the upload queue and the yogurtTeam:* IPC the Team UI uses.
  */
 import { ipcMain, safeStorage, shell, type BrowserWindow } from 'electron'
+import { execFile } from 'node:child_process'
 import { join } from 'node:path'
+import { audioHelperPath } from '../capture'
 import type { AudioExt } from '../audio'
 import type { Store } from '../store'
 import { bindTeamSession, TeamSession } from './session'
@@ -43,6 +45,10 @@ export function hookTeam(d: TeamDeps) {
   const send = () => { const w = d.window(); if (w && !w.isDestroyed()) w.webContents.send(TEAM_CHANGED) }
   const getQueue = () => (queue ??= new UploadQueue({
     file, session, store: d.store, dirOf: d.dirOf, audioKinds: d.audioKinds(), removeRecording: d.removeRecording, changed: send,
+    mixAudio: (inputs, out) => new Promise((resolve, reject) => {
+      execFile(audioHelperPath(), ['mix', '--out', out, ...inputs], { timeout: 30 * 60_000, windowsHide: true }, (error, _stdout, stderr) =>
+        error ? reject(new Error(String(stderr).trim() || error.message)) : resolve())
+    }),
   }))
   session.onChange(send)
 

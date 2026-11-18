@@ -12,6 +12,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 - `server/` (the team server: sign-in, Drive, admin page, summaries)
 - `app/src/main/team/` (desktop: sign-in, upload, OpenRouter summaries)
 - `app/src/renderer/src/team/` (desktop UI for team features)
+- `app/native/yogurt-audio-win/src/mix.rs`, `app/native/yogurt-audio-linux/src/mix.rs` (the `mix` command: both tracks as one file for Drive)
 
 ## Upstream files the fork edits
 
@@ -27,6 +28,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/preload/index.ts` | `import './team'`, which exposes `window.yogurtTeam` |
 | `app/src/renderer/src/screens/Settings.tsx` | `<TeamSettings />` section |
 | `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row; `<TeamSignInNeeded />` above a summary waiting on sign-in |
+| `app/native/yogurt-audio/main.swift` | `mix --out FILE IN...` block before the command guard (Mac side of the one-file recording) |
+| `app/native/yogurt-audio-win/src/main.rs`, `app/native/yogurt-audio-linux/src/main.rs` | `mod mix` and the `"mix"` match arm |
 | `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts`, `llm.ts` |
 | `app/src/main/notes/enhance.ts` | Optional `Llm.partTokens` so the cloud model (team/llm.ts) splits long meetings into bigger parts |
 | `app/src/main/setup.ts` | `remoteNotes` dep: when the team server writes notes, skip the notes model download (speech and embedding still download); `startLocalNotes()` resumes it |

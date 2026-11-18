@@ -12,6 +12,7 @@
 // stdin: pause, resume, stop (end of input also stops), mic UID or mic auto. A mic's UID is its PulseAudio source name.
 
 mod join;
+mod mix; // Yogurt Team
 mod json;
 mod ogg_opus;
 mod pulse;
@@ -298,6 +299,11 @@ fn main() {
         "speech-install" => { println!(r#"{{"installed":false}}"#); return }
         "mic-devices" => { mic_devices(); return }
         "decode" if args.len() >= 3 => { decode(&args[2]); return }
+        // Yogurt Team: one file of both tracks for the team's Drive
+        "mix" => match arg_value(&args, "--out") {
+            Some(o) => { let ins: Vec<PathBuf> = args[2..].iter().filter(|a| a.as_str() != "--out" && a.as_str() != o).map(PathBuf::from).collect(); if let Err(e) = mix::mix(Path::new(&o), &ins) { fail(&e) } return }
+            None => fail("mix: --out is required"),
+        },
         _ => {}
     }
     let dir_arg = arg_value(&args, "--dir");

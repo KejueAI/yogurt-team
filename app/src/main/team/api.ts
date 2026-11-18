@@ -13,13 +13,15 @@ export class TeamApiError extends Error {
   get transient(): boolean { return this.status === 0 || this.status >= 500 || this.status === 408 || this.status === 429 || this.code === 'not_configured' }
 }
 
-export type UploadAudio = { track: 'me' | 'them'; fileName: string; mimeType: string; size: number }
+/** me and them are the raw tracks; recording is both mixed, the one file the app sends now */
+export type AudioTrack = 'me' | 'them' | 'recording'
+export type UploadAudio = { track: AudioTrack; fileName: string; mimeType: string; size: number }
 export type UploadRequest = {
   meetingId: string; calendarEventId?: string; title: string; startedAt: string; endedAt: string
   attendees: string[]; notesMarkdown: string; transcriptMarkdown: string; audio: UploadAudio[]
 }
-export type UploadResponse = { uploadId: string; folderUrl: string; audio: { track: 'me' | 'them'; uploadUrl: string }[] }
-export type CompleteAudio = { track: 'me' | 'them'; ok: boolean; error?: string }
+export type UploadResponse = { uploadId: string; folderUrl: string; audio: { track: AudioTrack; uploadUrl: string }[] }
+export type CompleteAudio = { track: AudioTrack; ok: boolean; error?: string }
 
 export type TeamApi = ReturnType<typeof teamApi>
 

@@ -1229,6 +1229,63 @@ if args.count >= 2, args[1] == "speech-locales" || args[1] == "speech-install" {
   exit(0)
   #endif
 }
+// Yogurt Team: mix --out FILE IN... sums tracks that are already on meeting time (me.m4a, them.m4a) into one m4a
+// for listening back. The inputs are left as they are.
+if args.count >= 4, args[1] == "mix", let outArg = argValue("--out") {
+  let inputs = args.dropFirst(2).filter { $0 != "--out" && $0 != outArg }.map { URL(fileURLWithPath: $0) }
+  guard !inputs.isEmpty else { fail("mix: no input files") }
+  var readers: [(AVAssetReader, AVAssetReaderTrackOutput)] = []
+  for url in inputs {
+    let asset = AVURLAsset(url: url)
+    guard let src = asset.tracks(withMediaType: .audio).first, let reader = try? AVAssetReader(asset: asset) else { fail("mix: can't read \(url.lastPathComponent)") }
+    let o = AVAssetReaderTrackOutput(track: src, outputSettings: [
+      AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48000, AVNumberOfChannelsKey: 1,
+      AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false, AVLinearPCMIsBigEndianKey: false,
+    ])
+    guard reader.canAdd(o) else { fail("mix: can't decode \(url.lastPathComponent)") }
+    reader.add(o)
+    guard reader.startReading() else { fail("mix: can't read \(url.lastPathComponent)") }
+    readers.append((reader, o))
+  }
+  let outURL = URL(fileURLWithPath: outArg)
+  try? FileManager.default.removeItem(at: outURL)
+  let out = Track("mix", file: outURL)
+  out.openWriter()
+  var pending = Array(repeating: [Float](), count: readers.count)
+  var done = Array(repeating: false, count: readers.count)
+  let chunk = 48000
+  while true {
+    // fill every live input to a second ahead, then write what all of them (or the ones still going) have
+    for i in readers.indices where !done[i] {
+      while pending[i].count < chunk {
+        guard let sb = readers[i].1.copyNextSampleBuffer() else { done[i] = true; break }
+        let frames = CMSampleBufferGetNumSamples(sb)
+        guard frames > 0, let b = AVAudioPCMBuffer(pcmFormat: mono48, frameCapacity: AVAudioFrameCount(frames)) else { continue }
+        b.frameLength = AVAudioFrameCount(frames)
+        if CMSampleBufferCopyPCMDataIntoAudioBufferList(sb, at: 0, frameCount: Int32(frames), into: b.mutableAudioBufferList) != noErr { fail("mix: bad audio") }
+        pending[i].append(contentsOf: UnsafeBufferPointer(start: b.floatChannelData![0], count: frames))
+      }
+    }
+    let n = readers.indices.map { done[$0] ? pending[$0].count : min(pending[$0].count, chunk) }.max() ?? 0
+    if n == 0 { break }
+    guard let b = AVAudioPCMBuffer(pcmFormat: mono48, frameCapacity: AVAudioFrameCount(n)) else { fail("mix: out of memory") }
+    b.frameLength = AVAudioFrameCount(n)
+    let dst = b.floatChannelData![0]
+    for k in 0..<n { dst[k] = 0 }
+    for i in readers.indices {
+      let take = min(n, pending[i].count)
+      for k in 0..<take { dst[k] += pending[i][k] }
+      pending[i].removeFirst(take)
+    }
+    for k in 0..<n { dst[k] = max(-1, min(1, dst[k])) }
+    out.write(b)
+  }
+  let g = DispatchGroup()
+  out.finish(g)
+  g.wait()
+  guard out.writerCompleted else { fail("mix: could not write \(outURL.lastPathComponent)") }
+  exit(0)
+}
 guard args.count >= 4, (args[1] == "record" || args[1] == "join" || args[1] == "inspect" || args[1] == "compact"), let dirArg = argValue("--dir") else {
   fail("usage: yogurt-audio record --dir DIR [--part N --start-ms X] [--speech LOCALE] | join --dir DIR | inspect --dir DIR | compact --dir DIR --out STAGING | speech-locales | speech-install LOCALE")
 }

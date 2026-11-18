@@ -236,7 +236,7 @@ export async function startUpload(
     const sessions: { track: string; uploadUrl: string }[] = []
     for (const a of wantedAudio) {
       const uploadUrl = await drive.createResumableSession({
-        name: withExtension(fileName(a.track), a.fileName),
+        name: withExtension(fileName(a.track === 'recording' ? 'Recording' : a.track), a.fileName),
         parentId: meeting.folder_id,
         mimeType: a.mimeType,
         size: a.size,

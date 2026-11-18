@@ -15,6 +15,7 @@
 // stdin: pause, resume, stop (end of input also stops), mic ID or mic auto (switch without stopping). Problems go to stderr.
 mod gap;
 mod join;
+mod mix; // Yogurt Team
 mod ogg;
 mod oggopus;
 mod opus;
@@ -52,6 +53,11 @@ fn main() {
         "mic-devices" => mic_devices(),
         "writer-probe" => writer_probe(&args),
         "decode" if args.len() >= 3 => decode(&args[2]),
+        // Yogurt Team: one file of both tracks for the team's Drive
+        "mix" => match arg_value(&args, "--out") {
+            Some(o) => { let ins: Vec<PathBuf> = args[2..].iter().filter(|a| a.as_str() != "--out" && a.as_str() != o).map(PathBuf::from).collect(); if let Err(e) = mix::mix(Path::new(&o), &ins) { fail(&e) } }
+            None => fail("mix: --out is required"),
+        },
         "record" | "join" | "inspect" | "compact" if args.len() >= 4 => {
             let Some(dir) = arg_value(&args, "--dir") else { fail(USAGE) };
             let dir = PathBuf::from(dir);

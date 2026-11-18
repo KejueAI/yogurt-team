@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { TeamFile } from '../src/main/team/teamFile'
-import { UploadQueue, backoffMs, type PutFile } from '../src/main/team/uploads'
+import { UploadQueue, backoffMs, type MixAudio, type PutFile } from '../src/main/team/uploads'
 import type { TeamMe } from '../src/main/team/types'
 
 const roots: string[] = [], stores: Store[] = [], queues: UploadQueue[] = []
@@ -44,7 +44,7 @@ function setup(o: { me?: TeamMe; audio?: boolean; signedIn?: boolean } = {}) {
   const requests: { method: string; url: string; body: any }[] = []
   let uploadN = 0
   const handlers: Record<string, (body: any) => Response> = {
-    'POST /api/uploads': () => { uploadN++; return json(200, { uploadId: `u${uploadN}`, folderUrl: 'https://drive.example/f', audio: [{ track: 'me', uploadUrl: 'https://put.example/me' }, { track: 'them', uploadUrl: 'https://put.example/them' }] }) },
+    'POST /api/uploads': () => { uploadN++; return json(200, { uploadId: `u${uploadN}`, folderUrl: 'https://drive.example/f', audio: [{ track: 'recording', uploadUrl: 'https://put.example/recording' }] }) },
     'POST /api/uploads/:id/complete': () => json(200, { ok: true }),
     [`DELETE /api/uploads/by-meeting/${m.id}`]: () => json(200, { ok: true }),
   }
@@ -59,18 +59,20 @@ function setup(o: { me?: TeamMe; audio?: boolean; signedIn?: boolean } = {}) {
   const puts: { url: string; size: number; mimeType: string }[] = []
   const putFile = vi.fn<PutFile>(async (url, _path, size, mimeType) => { puts.push({ url, size, mimeType }) })
   const removeRecording = vi.fn()
+  // the helper's mix, faked: the mixed file is the tracks one after another
+  const mixAudio = vi.fn<MixAudio>(async (inputs, out) => { writeFileSync(out, Buffer.concat(inputs.map(i => readFileSync(i)))) })
   const file = new TeamFile(join(root, 'team.json'))
   const q = new UploadQueue({
     file, session, store, dirOf: id => join(root, 'meetings', id), audioKinds: ['m4a'], removeRecording,
-    fetch: fetch as never, putFile, now: () => now,
+    fetch: fetch as never, putFile, mixAudio, now: () => now,
   })
   queues.push(q)
   const flush = () => new Promise(r => setTimeout(r, 0))
   return {
-    root, store, m, dir, q, file, session, fetch, requests, handlers, puts, putFile, removeRecording, flush,
+    root, store, m, dir, q, file, session, fetch, requests, handlers, puts, putFile, removeRecording, mixAudio, flush,
     advance: (ms: number) => { now += ms },
     signOut: () => { signedIn = false; listeners.forEach(f => f()) },
-    reopen: () => new UploadQueue({ file: new TeamFile(join(root, 'team.json')), session, store, dirOf: id => join(root, 'meetings', id), audioKinds: ['m4a'], removeRecording, fetch: fetch as never, putFile, now: () => now }),
+    reopen: () => new UploadQueue({ file: new TeamFile(join(root, 'team.json')), session, store, dirOf: id => join(root, 'meetings', id), audioKinds: ['m4a'], removeRecording, fetch: fetch as never, putFile, mixAudio, now: () => now }),
   }
 }
 
@@ -88,12 +90,14 @@ describe('team uploads: grace period', () => {
     expect(create.body).toMatchObject({
       meetingId: s.m.id, calendarEventId: 'evt1', title: 'Launch',
       startedAt: '2026-01-05T10:00:00.000Z', endedAt: '2026-01-05T11:00:00.000Z', attendees: ['ann@example.com'],
-      audio: [{ track: 'me', fileName: 'me.m4a', mimeType: 'audio/mp4', size: 4 }, { track: 'them', fileName: 'them.m4a', mimeType: 'audio/mp4', size: 6 }],
+      audio: [{ track: 'recording', fileName: 'recording.m4a', mimeType: 'audio/mp4', size: 10 }],
     })
     expect(create.body.notesMarkdown).toContain('Tuesday')
     expect(create.body.transcriptMarkdown).toContain('Launch on Tuesday')
-    expect(s.puts).toEqual([{ url: 'https://put.example/me', size: 4, mimeType: 'audio/mp4' }, { url: 'https://put.example/them', size: 6, mimeType: 'audio/mp4' }])
-    expect(s.requests.find(r => r.url.endsWith('/complete'))).toMatchObject({ url: '/api/uploads/u1/complete', body: { audio: [{ track: 'me', ok: true }, { track: 'them', ok: true }] } })
+    // one file of both tracks mixed, never the separate tracks
+    expect(s.mixAudio).toHaveBeenCalledWith([join(s.dir, 'me.m4a'), join(s.dir, 'them.m4a')], expect.stringMatching(/recording\.m4a$/))
+    expect(s.puts).toEqual([{ url: 'https://put.example/recording', size: 10, mimeType: 'audio/mp4' }])
+    expect(s.requests.find(r => r.url.endsWith('/complete'))).toMatchObject({ url: '/api/uploads/u1/complete', body: { audio: [{ track: 'recording', ok: true }] } })
     expect(s.q.meetingState(s.m.id).upload).toMatchObject({ state: 'uploaded', folderUrl: 'https://drive.example/f' })
   })
 
@@ -246,12 +250,21 @@ describe('team uploads: the recording deletion waits for the audio', () => {
     expect(s.removeRecording).toHaveBeenCalledWith(s.m.id)
   })
 
+  it('a recording that cannot be mixed is retried later and nothing is sent', async () => {
+    const s = setup()
+    s.mixAudio.mockRejectedValueOnce(new Error('helper crashed'))
+    s.q.summarized(s.m.id)
+    s.advance(10 * 60_000); await s.q.runDue()
+    expect(s.puts).toEqual([])
+    expect(s.q.meetingState(s.m.id).upload?.state).not.toBe('uploaded')
+  })
+
   it('keeps holding while an audio upload fails', async () => {
     const s = setup({ me: { ...ME, team: { ...ME.team, graceMinutes: 0 } } })
     s.putFile.mockRejectedValueOnce(new Error('connection reset'))
     s.q.summarized(s.m.id); await s.q.runDue(); await s.flush()
     expect(s.q.meetingState(s.m.id).upload?.state).toBe('failed')
-    expect(s.requests.find(r => r.url.endsWith('/complete'))?.body.audio[0]).toMatchObject({ track: 'me', ok: false })
+    expect(s.requests.find(r => r.url.endsWith('/complete'))?.body.audio[0]).toMatchObject({ track: 'recording', ok: false })
     expect(s.removeRecording).not.toHaveBeenCalled()
     s.advance(backoffMs(1)); await s.q.runDue(); await s.flush()
     expect(s.removeRecording).toHaveBeenCalledTimes(1)
