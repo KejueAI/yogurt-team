@@ -73,3 +73,15 @@ Pages under `/admin`. Bootstrapped by `ADMIN_EMAILS` (comma-separated).
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Optional; the admin page can set them instead |
 
 Redirect URIs to register on the OAuth client: `<PUBLIC_URL>/auth/google/callback` (sign-in) and `<PUBLIC_URL>/auth/drive/callback` (admin Drive connect).
+
+## Contract notes
+
+Added by the server implementation. Nothing above was changed; these pin down details the contract leaves open.
+
+- Error codes beyond the three listed: `bad_request` (400, invalid body or params), `not_found` (404, unknown upload id or one that belongs to another recorder), `upstream_error` (502, Google Drive or OpenRouter failed), `internal` (500). The app should treat any unknown code as a generic failure and show `message`.
+- `GET /auth/desktop/start` error values sent to the loopback callback: `cancelled` (user backed out of Google), `forbidden` (domain/allowlist/blocked), `failed` (anything else). An invalid `port` (outside 1024–65535) or `state` gets a 400 HTML page instead, because there is nowhere safe to redirect.
+- `POST /api/uploads/:uploadId/complete` returns `{ "uploadId": "...", "status": "complete" | "failed" }`. `DELETE /api/uploads/by-meeting/:meetingId` returns `{ "deleted": <number of Drive files removed> }` and is a no-op (`deleted: 0`) when nothing was uploaded.
+- `POST /api/llm/chat` failures before the stream starts (no key, OpenRouter rejects the request) are normal JSON errors (`not_configured` 409, `upstream_error` 502) with a non-SSE content type; the app should check `response.ok` before reading the stream.
+- Audio `uploadUrl` is a Google resumable session created for exactly `size` bytes. Send one `PUT` with `Content-Length: size` (a `Content-Type` equal to the declared `mimeType` is fine but not required). Google returns 200/201 on success; a different byte count fails. Sessions expire after about a week, so call `/complete` right after the PUTs, and re-run `POST /api/uploads` to get fresh URLs for a retry.
+- Meeting matching by `calendarEventId` is limited to meetings starting within 18 hours of each other, so a recurring series that reuses one event id does not collapse into a single folder. Title matching is case/whitespace-insensitive.
+- Re-uploading with `audio: []` keeps previously uploaded audio for that recorder; it is not treated as "delete audio".
