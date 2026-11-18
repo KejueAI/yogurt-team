@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Catalog, Hardware } from '@yogurt/picker'
 import bundled from '../../catalog/catalog.json'
 import {
-  createTeamNotes, estimateTokens, NotConfiguredError, RemoteLlm, RemoteLlmError, REMOTE_PART_TOKENS, signedOutSession,
+  createTeamNotes, estimateTokens, NotConfiguredError, RemoteLlm, RemoteLlmError, REMOTE_NOTES_TOKENS, REMOTE_PART_TOKENS, signedOutSession,
   streamChat, UnauthorizedError, type NotesModelLike, type TeamSession,
 } from '../src/main/team/llm'
 import { enhance, MAX_PART_TOKENS, partBudget, type Llm } from '../src/main/notes/enhance'
@@ -172,6 +172,8 @@ describe('RemoteLlm', () => {
     const s = server({ chunks: [sse({ delta: '## Notes\n- one' }), sse({ done: true })] })
     await enhance(input, new RemoteLlm({ ...base, fetch: s.fetch }), () => {})
     expect(s.calls.filter((c) => c.body.purpose === 'summary')).toHaveLength(0)
+    // the notes get the cloud budget, so a long meeting's notes are not cut off halfway
+    expect(s.calls[0]!.body.maxTokens).toBe(REMOTE_NOTES_TOKENS)
     const local = localLlm(16_384)
     await enhance(input, local, () => {})
     expect(local.prompts.length).toBeGreaterThan(1)

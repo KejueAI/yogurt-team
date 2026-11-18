@@ -48,6 +48,8 @@ export class RemoteLlmError extends Error {
 export const REMOTE_CONTEXT_TOKENS = 96_000
 /** a long meeting is split into parts this big for the cloud model (local: MAX_PART_TOKENS, 12k) */
 export const REMOTE_PART_TOKENS = 32_000
+/** Notes for a long meeting need room: at 2,048 tokens a three-hour meeting's notes were cut off halfway */
+export const REMOTE_NOTES_TOKENS = 6_144
 
 /** chars/4: good enough for budgeting a remote model whose tokenizer the app doesn't have */
 export const estimateTokens = (text: string) => Math.ceil(text.length / 4)
@@ -135,6 +137,7 @@ const purposeOf = (base: Purpose | undefined, opts?: { summary?: boolean; maxTok
 export class RemoteLlm implements Llm {
   readonly contextSize = REMOTE_CONTEXT_TOKENS
   readonly partTokens = REMOTE_PART_TOKENS
+  readonly notesTokens = REMOTE_NOTES_TOKENS
 
   constructor(private o: {
     serverUrl: string; token: string; signal?: AbortSignal; purpose?: Purpose; fetch?: typeof fetch

@@ -14,6 +14,8 @@ export type Llm = {
   contextSize: number
   /** Yogurt Team: the biggest part of a long meeting for this model (default MAX_PART_TOKENS; the cloud model's is bigger) */
   partTokens?: number
+  /** Yogurt Team: the most the notes may run to (default NOTES_TOKENS; the cloud model writes long meetings in full) */
+  notesTokens?: number
   /** tokens in each text, by the loaded model's own tokenizer */
   count(texts: string[]): Promise<number[]>
   /**
@@ -341,9 +343,9 @@ export function cleanTitle(raw: string, me = ''): string {
 }
 
 /** the most transcript (in tokens) the notes prompt holds whole, with room for the notes */
-export async function wholeBudget(llm: Pick<Llm, 'count' | 'contextSize'>, language: string, mine = ''): Promise<number> {
+export async function wholeBudget(llm: Pick<Llm, 'count' | 'contextSize' | 'notesTokens'>, language: string, mine = ''): Promise<number> {
   const [overhead] = await llm.count([enhancePrompt({ title: '', attendees: [], mine, transcript: '', language, minutes: 60 })])
-  return llm.contextSize - overhead - NOTES_TOKENS
+  return llm.contextSize - overhead - (llm.notesTokens ?? NOTES_TOKENS)
 }
 
 /** the biggest part of a long meeting, in tokens */
@@ -396,7 +398,7 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
     input.signal?.throwIfAborted()
     const total = lineTokens.reduce((a, b) => a + b + 1, 0)
     // parts summarised during the meeting mean it was too long already: those are used even if it fits now
-    if (!done.length && overhead + total + NOTES_TOKENS <= llm.contextSize) break
+    if (!done.length && overhead + total + (llm.notesTokens ?? NOTES_TOKENS) <= llm.contextSize) break
     const max = await partBudget(llm, language)
     input.signal?.throwIfAborted()
     const from = done.reduce((n, p) => n + p.lines.length, 0)
@@ -419,7 +421,7 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
   }
 
   const prompt = enhancePrompt({ ...base, transcript, parts })
-  let md = tidyNotes(await llm.chat(prompt, (text) => { if (!input.signal?.aborted) onToken(text) }, { maxTokens: NOTES_TOKENS }), !!input.note?.trim())
+  let md = tidyNotes(await llm.chat(prompt, (text) => { if (!input.signal?.aborted) onToken(text) }, { maxTokens: llm.notesTokens ?? NOTES_TOKENS }), !!input.note?.trim())
   input.signal?.throwIfAborted()
   const written = md
   // the model sometimes stops before the next steps (it samples): ask for just that part, after what it wrote. Notes

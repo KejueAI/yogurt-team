@@ -524,7 +524,8 @@ app.whenReady().then(() => {
   // Yogurt Team: notes, titles and Ask written through the team server when summaries are on there (team/llm.ts)
   const teamNotes = createTeamNotes({ session: teamSession })
   teamSession.onChange(() => teamNotes.invalidate())
-  const setup = createSetup(() => teamNotes.remoteActive())
+  // A team build never downloads the local notes model while a team server is set: notes wait for sign-in instead
+  const setup = createSetup(async () => !!teamSession.serverUrl() || teamNotes.remoteActive())
   setup.onState((st) => win?.webContents.send('setup:state', st))
   ipcMain.handle('setup:state', () => setup.state)
   ipcMain.handle('setup:retry', () => setup.retry())
@@ -616,7 +617,7 @@ app.whenReady().then(() => {
     remove()
   }, 'enhance')))
   setup.onNotesModel(() => { queue.modelArrived(); conversations.refresh() })
-  teamNotes.onChange((on) => { if (on) { queue.modelArrived(); conversations.refresh() } else setup.startLocalNotes() })
+  teamNotes.onChange((on) => { if (on) { queue.modelArrived(); conversations.refresh() } else if (!teamSession.serverUrl()) setup.startLocalNotes() })
   // chat across meetings: every finished meeting chunked and embedded in the background, last in the queue
   const library = new Library(store.db)
   const indexer = createIndexer({ store, library, embedder, queue })
