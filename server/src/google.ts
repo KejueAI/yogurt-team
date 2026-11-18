@@ -386,3 +386,11 @@ function multipart(metadata: object, content: string, contentType: string): { bo
     `--${boundary}--`
   return { body, contentType: `multipart/related; boundary=${boundary}` }
 }
+
+/** A folder id from a pasted Drive link (…/folders/<id>, ?id=<id>) or a bare id; undefined when it is neither */
+export function folderIdFromInput(raw: string): string | undefined {
+  const s = raw.trim()
+  const m = s.match(/\/folders\/([\w-]{10,})/) ?? s.match(/[?&]id=([\w-]{10,})/)
+  if (m) return m[1]
+  return /^[\w-]{10,}$/.test(s) ? s : undefined
+}

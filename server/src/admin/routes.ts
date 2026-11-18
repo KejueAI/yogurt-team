@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { parseList } from '../access.js'
 import { USER_COLUMNS, revokeUserSessions, toUser, type User } from '../auth.js'
 import type { Deps, Env } from '../context.js'
-import { folderUrl, type DriveFile, type SharedDrive } from '../google.js'
+import { folderIdFromInput, folderUrl, type DriveFile, type SharedDrive } from '../google.js'
 import { PLACEHOLDERS, isValidTimezone, renderFolderPath, renderPattern, validatePattern } from '../naming.js'
 import { DEFAULT_MODEL, type DriveFolder, type TeamSettings } from '../settings.js'
 import { adminFromCookie } from '../routes/auth.js'
@@ -99,7 +99,12 @@ export function adminRoutes(deps: Deps): Hono<Env> {
       ? html`<p>Meetings go in <a href="${folderUrl(folder.id)}" target="_blank" rel="noopener"><strong>${folder.path || folder.name}</strong></a>.</p>`
       : html`<p class="muted">No folder picked yet. Desktop apps won't upload until one is.</p>`
   }
-  ${connected ? html`<a class="button${folder ? '' : ' primary'}" href="/admin/drive/pick">${folder ? 'Change folder' : 'Pick a folder'}</a>` : ''}
+  ${connected ? html`<a class="button${folder ? '' : ' primary'}" href="/admin/drive/pick">${folder ? 'Change folder' : 'Pick a folder'}</a>
+  <form method="post" action="/admin/drive/folder">
+    <label for="folderLink">Or paste a Drive folder link</label>
+    <input id="folderLink" type="text" name="id" placeholder="https://drive.google.com/drive/folders/…" required>
+    <button type="submit">Use this folder</button>
+  </form>` : ''}
 </section>`
     return render(c, 'drive', 'Drive', status)
   })
@@ -163,8 +168,8 @@ export function adminRoutes(deps: Deps): Hono<Env> {
 
   app.post('/drive/folder', async (c) => {
     const form = await c.req.parseBody()
-    const id = str(form, 'id')
-    if (!id) return backWithError(c, '/admin/drive', 'No folder was chosen.')
+    const id = folderIdFromInput(str(form, 'id'))
+    if (!id) return backWithError(c, '/admin/drive', 'That is not a Drive folder link.')
     const drive = await deps.drive()
     if (!drive) return c.redirect('/admin/drive', 303)
     // Check the folder exists and is reachable before saving it.

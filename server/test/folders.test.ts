@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ensureParents } from '../src/uploads.js'
+import { folderIdFromInput } from '../src/google.js'
 
 type F = { id: string; name: string; parent: string; appProperties?: Record<string, string> }
 
@@ -36,5 +37,16 @@ describe('date folders', () => {
   })
   it('with no grouping levels the meeting goes in the root', async () => {
     expect(await ensureParents(fakeDrive() as never, 'root', [])).toBe('root')
+  })
+})
+
+describe('pasted folder links', () => {
+  it('reads ids from links and bare ids', () => {
+    const id = '1sCRpgJnJRhJ_FoPeUh8JJ2i9VZdZAeL-'
+    expect(folderIdFromInput(`https://drive.google.com/drive/folders/${id}`)).toBe(id)
+    expect(folderIdFromInput(`https://drive.google.com/drive/u/1/folders/${id}?usp=sharing`)).toBe(id)
+    expect(folderIdFromInput(`https://drive.google.com/open?id=${id}`)).toBe(id)
+    expect(folderIdFromInput(` ${id} `)).toBe(id)
+    expect(folderIdFromInput('not a link')).toBeUndefined()
   })
 })
