@@ -1,0 +1,10 @@
+/* Yogurt Team: the Team section of Settings and the Private switch under a note's title */
+.team-input { width:100%;max-width:320px;height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink);font:13px var(--font-sans); }
+.team-server-row { display:flex;gap:8px;align-items:center;margin-top:6px; }
+.team-error { color:#C2410C;font-size:12px;margin-top:4px; }
+.team-facts { margin:4px 0 0;padding:0;list-style:none;color:var(--muted);font-size:12px;line-height:18px; }
+.team-meeting { display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted); }
+.team-meeting button.team-private { display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer; }
+.team-meeting button.team-private[aria-pressed=true] { color:var(--ink);background:color-mix(in srgb,var(--ink) 6%,transparent); }
+.team-meeting .team-link { border:none;background:none;padding:0;color:var(--written, var(--ink));text-decoration:underline;font-size:12px;cursor:pointer; }
+.team-meeting .team-failed { color:#C2410C; }

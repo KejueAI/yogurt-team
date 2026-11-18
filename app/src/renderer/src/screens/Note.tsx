@@ -37,6 +37,7 @@ import { FolderChip, FolderPicker, type FolderSuggestion } from '../components/F
 import { FolderName } from '../components/FolderDialogs'
 import { InlineError } from '../components/InlineError'
 import { Swap, SwapText } from '../components/Swap'
+import { TeamMeeting } from '../team/TeamMeeting' // Yogurt Team
 
 /** A revision is dirty until main acknowledges it; failed text also remains there across navigation/reload. */
 function useAutosave(id: string, side: NoteSide, text: string, saved?: NoteSaveResult) {
@@ -351,6 +352,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
               <NoteDate m={m} />
               <People m={m} />
               <FolderChip meetingId={id} onNew={() => setNamingFolder(true)} suggestion={folderSuggestion} />
+              <TeamMeeting meetingId={id} />
             </div>
             <div data-testid={recording ? 'rec-bar' : 'note-bar'} className="note-header-actions">
               <div data-testid="note-state" data-state={m.state} data-paused={!!m.paused} className="note-recording-group" data-recording={recording && !finishing} role="group" aria-label={recording ? m.paused ? t('Paused') : t('Recording') : t('Meeting controls')}>
