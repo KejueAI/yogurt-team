@@ -17,7 +17,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | File | Change |
 |---|---|
 | `app/electron-builder.yml` | App ID `co.kejue.yogurtteam`, product name "Yogurt Team", update feed points at this repo, permission text no longer says "Nothing leaves your Mac", Windows executable name pinned to `Yogurt`, disk image title |
-| `app/src/main/index.ts` | `app.setName('Yogurt Team')`, Windows AppUserModelId; `hookTeam(...)` before `hookNotes`, whose `summarized` hands the meeting to the team upload queue (which runs upstream's recording deletion once the audio is uploaded) |
+| `app/src/main/index.ts` | `app.setName('Yogurt Team')`, Windows AppUserModelId; `hookTeam(...)` before `hookNotes`, whose `summarized` hands the meeting to the team upload queue (which runs upstream's recording deletion once the audio is uploaded); wraps the notes model with `createTeamNotes` (team/llm.ts) using `teamSession`, so the notes queue and Ask don't wait for a local model while the team server writes notes |
 | `app/src/main/paths.ts` | Data folder `Yogurt Team` |
 | `app/test/paths.test.ts` | Expects the `Yogurt Team` data folder |
 | `app/scripts/release-mac.sh` | Checks the new bundle identifier and the `Yogurt Team.app` path |
@@ -25,7 +25,9 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/preload/index.ts` | `import './team'`, which exposes `window.yogurtTeam` |
 | `app/src/renderer/src/screens/Settings.tsx` | `<TeamSettings />` section |
 | `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row |
-| `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts` |
+| `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts`, `llm.ts` |
+| `app/src/main/notes/enhance.ts` | Optional `Llm.partTokens` so the cloud model (team/llm.ts) splits long meetings into bigger parts |
+| `app/src/main/setup.ts` | `remoteNotes` dep: when the team server writes notes, skip the notes model download (speech and embedding still download); `startLocalNotes()` resumes it |
 
 ## Merge rules
 

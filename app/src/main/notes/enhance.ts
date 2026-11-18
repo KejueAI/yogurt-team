@@ -12,6 +12,8 @@ import { respell, spellingLine, type MeetingWords } from '../vocab'
 export type Llm = {
   /** tokens the loaded model can read at once */
   contextSize: number
+  /** Yogurt Team: the biggest part of a long meeting for this model (default MAX_PART_TOKENS; the cloud model's is bigger) */
+  partTokens?: number
   /** tokens in each text, by the loaded model's own tokenizer */
   count(texts: string[]): Promise<number[]>
   /**
@@ -345,9 +347,9 @@ export async function wholeBudget(llm: Pick<Llm, 'count' | 'contextSize'>, langu
 }
 
 /** the biggest part of a long meeting, in tokens */
-export async function partBudget(llm: Pick<Llm, 'count' | 'contextSize'>, language: string): Promise<number> {
+export async function partBudget(llm: Pick<Llm, 'count' | 'contextSize' | 'partTokens'>, language: string): Promise<number> {
   const [overhead] = await llm.count([summaryPrompt('', 1, language)])
-  return Math.max(500, Math.min(MAX_PART_TOKENS, llm.contextSize - overhead - SUMMARY_TOKENS - 64))
+  return Math.max(500, Math.min(llm.partTokens ?? MAX_PART_TOKENS, llm.contextSize - overhead - SUMMARY_TOKENS - 64))
 }
 
 /** the earlier parts that cover the transcript's first lines, as long as they match it line for line */
