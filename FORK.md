@@ -21,6 +21,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/main/paths.ts` | Data folder `Yogurt Team` |
 | `app/test/paths.test.ts` | Expects the `Yogurt Team` data folder |
 | `app/scripts/release-mac.sh` | Checks the new bundle identifier |
+| `app/test/catalog.test.ts` | Network audit allows `main/team/llm.ts` (requests to the team server) |
 | `app/src/main/notes/enhance.ts` | Optional `Llm.partTokens` so the cloud model (team/llm.ts) splits long meetings into bigger parts |
 | `app/src/main/setup.ts` | `remoteNotes` dep: when the team server writes notes, skip the notes model download (speech and embedding still download); `startLocalNotes()` resumes it |
 
