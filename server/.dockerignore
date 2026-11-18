@@ -1,0 +1,10 @@
+node_modules
+dist
+test
+*.md
+.env
+.env.*
+Dockerfile
+.dockerignore
+vitest.config.ts
+northflank-template.json
