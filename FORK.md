@@ -8,6 +8,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 
 - `PLAN.md`, `FORK.md`
 - `.github/workflows/upstream-sync.yml`
+- `.github/actionlint.yaml` (Blacksmith runner labels)
 - `server/` (the team server: sign-in, Drive, admin page, summaries)
 - `app/src/main/team/` (desktop: sign-in, upload, OpenRouter summaries)
 - `app/src/renderer/src/team/` (desktop UI for team features)
@@ -34,3 +35,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 
 - Never take upstream's version of the lines above; re-apply the fork's values.
 - `app/package.json` keeps upstream's version with a `-team.N` suffix.
+
+## Linux runners
+
+Every Linux job's `runs-on` reads the repo variable `LINUX_RUNNER` (for `ubuntu-latest` / `ubuntu-24.04` jobs) or `LINUX_RUNNER_2204` (for `ubuntu-22.04` jobs, which build against older glibc), falling back to the GitHub-hosted image when unset. KejueAI sets them to `blacksmith-4vcpu-ubuntu-2404` and `blacksmith-4vcpu-ubuntu-2204`. Mac and Windows jobs stay on GitHub-hosted runners. When upstream adds a Linux job, wrap its `runs-on` the same way.

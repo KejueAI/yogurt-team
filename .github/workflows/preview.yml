@@ -43,7 +43,7 @@ jobs:
             platform: --linux
             unpacked: linux-unpacked
             files: app/dist/Yogurt-linux-*.AppImage
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ (matrix.os == 'ubuntu-22.04' && vars.LINUX_RUNNER_2204) || (matrix.os != 'ubuntu-22.04' && startsWith(matrix.os, 'ubuntu') && vars.LINUX_RUNNER) || matrix.os }}
     timeout-minutes: 120
     # Azure trusts sign-in tokens from this repository's signing environment only (managed identity yogurt-github-signing)
     environment: ${{ inputs.release && 'signing' || '' }}

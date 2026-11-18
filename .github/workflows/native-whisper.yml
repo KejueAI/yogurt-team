@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ (matrix.os == 'ubuntu-22.04' && vars.LINUX_RUNNER_2204) || (matrix.os != 'ubuntu-22.04' && startsWith(matrix.os, 'ubuntu') && vars.LINUX_RUNNER) || matrix.os }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +200,7 @@ jobs:
         include:
           - { os: ubuntu-24.04, from: Linux }
           - { os: windows-2022, from: Windows }
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ (matrix.os == 'ubuntu-22.04' && vars.LINUX_RUNNER_2204) || (matrix.os != 'ubuntu-22.04' && startsWith(matrix.os, 'ubuntu') && vars.LINUX_RUNNER) || matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

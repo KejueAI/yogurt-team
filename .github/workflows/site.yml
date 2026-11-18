@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   site:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
     defaults:
       run:
         working-directory: site

@@ -74,7 +74,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ (matrix.os == 'ubuntu-22.04' && vars.LINUX_RUNNER_2204) || (matrix.os != 'ubuntu-22.04' && startsWith(matrix.os, 'ubuntu') && vars.LINUX_RUNNER) || matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

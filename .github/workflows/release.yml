@@ -29,7 +29,7 @@ env:
 jobs:
   # what this run builds: everything (a tag, or a plain run by hand), or only Windows and Linux for a draft
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
     outputs:
       build: ${{ steps.plan.outputs.build }}
       mac: ${{ steps.plan.outputs.mac }}
@@ -169,7 +169,7 @@ jobs:
   publish:
     needs: [plan, build, other]
     if: github.event_name == 'push' && github.ref_type == 'tag' && needs.plan.outputs.build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -186,7 +186,7 @@ jobs:
   draft:
     needs: [plan, other]
     if: github.event_name == 'workflow_dispatch' && inputs.draft != '' && needs.plan.outputs.build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/download-artifact@v4
         with:

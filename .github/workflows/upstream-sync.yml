@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,6 +51,4 @@ jobs:
           link="${{ github.server_url }}/${{ github.repository }}/compare/main...upstream-sync?expand=1"
           open=$(gh issue list --state open --search "Sync with upstream Yogurt in:title" --json number -q '.[0].number')
           if [ -n "$open" ]; then gh issue comment "$open" --body "Updated: $link"
-          else gh issue create --title "Sync with upstream Yogurt" --body "$body
-
-Open the pull request: $link"; fi
+          else gh issue create --title "Sync with upstream Yogurt" --body "$(printf '%s\n\nOpen the pull request: %s' "$body" "$link")"; fi

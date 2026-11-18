@@ -25,7 +25,7 @@ concurrency:
 jobs:
   lock:
     # every crate version at least 14 days old and not yanked
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
       - name: Make Cargo.lock when it is missing
@@ -46,7 +46,7 @@ jobs:
   linux:
     needs: lock
     # the oldest supported glibc (Ubuntu 22.04)
-    runs-on: ubuntu-22.04
+    runs-on: ${{ vars.LINUX_RUNNER_2204 || 'ubuntu-22.04' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
