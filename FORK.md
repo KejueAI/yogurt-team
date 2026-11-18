@@ -21,7 +21,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/main/paths.ts` | Data folder `Yogurt Team` |
 | `app/test/paths.test.ts` | Expects the `Yogurt Team` data folder |
 | `app/scripts/release-mac.sh` | Checks the new bundle identifier and the `Yogurt Team.app` path |
-| `.github/workflows/release.yml` | `Yogurt Team.app` paths; repo variable `ALLOW_UNSIGNED_MAC=true` allows pilot releases without Apple secrets; without a certificate the Mac app is ad-hoc signed with hardened runtime off |
+| `.github/workflows/preview.yml` | Top-level env `MAIN_VITE_YOGURT_TEAM_SERVER` from repo variable `YOGURT_TEAM_SERVER` |
+| `.github/workflows/release.yml` | Top-level env `MAIN_VITE_YOGURT_TEAM_SERVER` from repo variable `YOGURT_TEAM_SERVER`; `Yogurt Team.app` paths; repo variable `ALLOW_UNSIGNED_MAC=true` allows pilot releases without Apple secrets; without a certificate the Mac app is ad-hoc signed with hardened runtime off |
 | `app/src/preload/index.ts` | `import './team'`, which exposes `window.yogurtTeam` |
 | `app/src/renderer/src/screens/Settings.tsx` | `<TeamSettings />` section |
 | `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row |

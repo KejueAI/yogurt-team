@@ -26,6 +26,8 @@ env:
   VULKAN_SDK_SHA256_WINDOWS: bcf2d75aa9556889ab974858666e20b3655b6055a0db704ccb47279ff33b5bfe
   MODELS_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1
   CARGO_TERM_COLOR: always
+  # yogurt-team: builds point at the team server in the repo variable YOGURT_TEAM_SERVER
+  MAIN_VITE_YOGURT_TEAM_SERVER: ${{ vars.YOGURT_TEAM_SERVER }}
 
 jobs:
   build:
