@@ -15,7 +15,7 @@ if [ "$ID" = 'Yogurt Local' ]; then
 fi
 cd "$(dirname "$0")/.."
 PROFILE="${YOGURT_NOTARY_PROFILE:-yogurt-notary}"
-APP=dist/mac-arm64/Yogurt.app
+APP='dist/mac-arm64/Yogurt Team.app'
 set --
 if [ "$LOCAL" = 1 ]; then
   # Pin the exact certificate; never silently fall back to ad-hoc or a different signer.

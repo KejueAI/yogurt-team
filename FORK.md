@@ -20,7 +20,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/main/index.ts` | `app.setName('Yogurt Team')`, Windows AppUserModelId |
 | `app/src/main/paths.ts` | Data folder `Yogurt Team` |
 | `app/test/paths.test.ts` | Expects the `Yogurt Team` data folder |
-| `app/scripts/release-mac.sh` | Checks the new bundle identifier |
+| `app/scripts/release-mac.sh` | Checks the new bundle identifier and the `Yogurt Team.app` path |
+| `.github/workflows/release.yml` | `Yogurt Team.app` paths; repo variable `ALLOW_UNSIGNED_MAC=true` allows pilot releases without Apple secrets; without a certificate the Mac app is ad-hoc signed with hardened runtime off |
 
 ## Merge rules
 
