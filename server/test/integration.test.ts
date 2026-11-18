@@ -217,14 +217,14 @@ describe.skipIf(!url)('server against Postgres', () => {
     expect(up1.folderUrl).toBe(`https://drive.google.com/drive/folders/${folder!.id}`)
     expect(up1.audio.map((a) => a.track)).toEqual(['mic', 'others'])
     const names = () => drive.children(folder!.id).map((f) => f.name).sort()
-    expect(names()).toEqual(['Boss – Notes', 'Boss – Transcript'])
-    expect(drive.children(folder!.id).find((f) => f.name === 'Boss – Notes')!.html).toContain('<strong>it</strong>')
+    expect(names()).toEqual(['Launch planning – Boss – Notes', 'Launch planning – Boss – Transcript'])
+    expect(drive.children(folder!.id).find((f) => f.name === 'Launch planning – Boss – Notes')!.html).toContain('<strong>it</strong>')
 
     // App PUTs the bytes, then completes.
     for (const a of up1.audio) drive.put(a.uploadUrl)
     const c1 = await call(boss, `/api/uploads/${up1.uploadId}/complete`, 'POST', { audio: up1.audio.map((a) => ({ track: a.track, ok: true })) })
     expect(c1.status).toBe(200)
-    expect(names()).toEqual(['Boss – Notes', 'Boss – Transcript', 'Boss – mic.m4a', 'Boss – others.m4a'])
+    expect(names()).toEqual(['Launch planning – Boss – Notes', 'Launch planning – Boss – Transcript', 'Launch planning – Boss – mic.m4a', 'Launch planning – Boss – others.m4a'])
     const log1 = await db.query('SELECT status FROM uploads WHERE id = $1', [up1.uploadId])
     expect(log1.rows[0].status).toBe('complete')
 
@@ -233,34 +233,34 @@ describe.skipIf(!url)('server against Postgres', () => {
     expect(r2.status).toBe(200)
     expect(((await r2.json()) as { folderUrl: string }).folderUrl).toBe(up1.folderUrl)
     expect(drive.children('root-folder')).toHaveLength(1)
-    expect(names()).toContain('Sam – Notes')
+    expect(names()).toContain('Launch planning – Sam – Notes')
 
     // Boss re-uploads with no audio: docs updated in place, audio kept.
-    const docIds = drive.children(folder!.id).filter((f) => f.name.startsWith('Boss – N')).map((f) => f.id)
+    const docIds = drive.children(folder!.id).filter((f) => f.name.startsWith('Launch planning – Boss – N')).map((f) => f.id)
     const r3 = await call(boss, '/api/uploads', 'POST', { ...meeting, notesMarkdown: '# Better notes', audio: [] })
     expect(r3.status).toBe(200)
     const up3 = (await r3.json()) as { audio: unknown[] }
     expect(up3.audio).toEqual([])
-    expect(names().filter((n) => n.startsWith('Boss'))).toEqual(['Boss – Notes', 'Boss – Transcript', 'Boss – mic.m4a', 'Boss – others.m4a'])
-    const notes = drive.children(folder!.id).find((f) => f.name === 'Boss – Notes')!
+    expect(names().filter((n) => n.startsWith('Launch planning – Boss'))).toEqual(['Launch planning – Boss – Notes', 'Launch planning – Boss – Transcript', 'Launch planning – Boss – mic.m4a', 'Launch planning – Boss – others.m4a'])
+    const notes = drive.children(folder!.id).find((f) => f.name === 'Launch planning – Boss – Notes')!
     expect(docIds).toContain(notes.id)
     expect(notes.html).toContain('Better notes')
 
     // Boss re-uploads just the mic track: the old mic file is replaced, others kept.
-    const oldMic = drive.children(folder!.id).find((f) => f.name === 'Boss – mic.m4a')!
+    const oldMic = drive.children(folder!.id).find((f) => f.name === 'Launch planning – Boss – mic.m4a')!
     const r4 = await call(boss, '/api/uploads', 'POST', { ...meeting, audio: [meeting.audio[0]] })
     const up4 = (await r4.json()) as { uploadId: string; audio: { track: string; uploadUrl: string }[] }
     drive.put(up4.audio[0]!.uploadUrl)
     await call(boss, `/api/uploads/${up4.uploadId}/complete`, 'POST', { audio: [{ track: 'mic', ok: true }] })
     expect(drive.files.has(oldMic.id)).toBe(false)
-    expect(names().filter((n) => n.startsWith('Boss'))).toEqual(['Boss – Notes', 'Boss – Transcript', 'Boss – mic.m4a', 'Boss – others.m4a'])
+    expect(names().filter((n) => n.startsWith('Launch planning – Boss'))).toEqual(['Launch planning – Boss – Notes', 'Launch planning – Boss – Transcript', 'Launch planning – Boss – mic.m4a', 'Launch planning – Boss – others.m4a'])
 
     // A failed audio PUT is reported and logged.
     const r5 = await call(boss, '/api/uploads', 'POST', { ...meeting, audio: [meeting.audio[1]] })
     const up5 = (await r5.json()) as { uploadId: string }
     const c5 = await call(boss, `/api/uploads/${up5.uploadId}/complete`, 'POST', { audio: [{ track: 'others', ok: false, error: 'network' }] })
     expect(await c5.json()).toMatchObject({ status: 'failed' })
-    expect(names().filter((n) => n.startsWith('Boss – others'))).toHaveLength(1)
+    expect(names().filter((n) => n.startsWith('Launch planning – Boss – others'))).toHaveLength(1)
 
     // Someone else can't complete Boss's upload.
     expect((await call(sam, `/api/uploads/${up5.uploadId}/complete`, 'POST', { audio: [] })).status).toBe(404)
@@ -268,7 +268,7 @@ describe.skipIf(!url)('server against Postgres', () => {
     // Boss deletes: only Boss's files go, the folder stays for Sam.
     const d1 = await call(boss, '/api/uploads/by-meeting/local-1', 'DELETE')
     expect(d1.status).toBe(200)
-    expect(names()).toEqual(['Sam – Notes', 'Sam – Transcript'])
+    expect(names()).toEqual(['Launch planning – Sam – Notes', 'Launch planning – Sam – Transcript'])
     // Sam deletes: folder is now empty and removed.
     await call(sam, '/api/uploads/by-meeting/sam-local', 'DELETE')
     expect(drive.files.has(folder!.id)).toBe(false)
@@ -292,7 +292,7 @@ describe.skipIf(!url)('server against Postgres', () => {
     const body = (await res.json()) as { folderUrl: string; audio: unknown[] }
     expect(body.audio).toEqual([])
     const folderId = body.folderUrl.split('/').pop()!
-    expect(drive.children(folderId).map((f) => f.name)).toEqual(['Boss – Notes'])
+    expect(drive.children(folderId).map((f) => f.name)).toEqual(['Launch planning – Boss – Notes'])
     await deps.settings.update(db, { uploadTranscript: true, uploadAudio: true })
   })
 

@@ -26,7 +26,7 @@ server/
     auth.ts                users, one-time codes, sessions, OAuth state
     google.ts              Google OAuth + Drive REST client
     settings.ts            team settings + encrypted secrets
-    naming.ts              {date} {title} / {recorder} – {kind} patterns
+    naming.ts              {date} {title} / {title} – {recorder} – {kind} patterns
     matching.ts            meeting folder matching
     markdown.ts            markdown → HTML for Google Docs import
     uploads.ts             upload/complete/delete logic
