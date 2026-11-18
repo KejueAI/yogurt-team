@@ -208,7 +208,11 @@ describe.skipIf(!url)('server against Postgres', () => {
     const r1 = await call(boss, '/api/uploads', 'POST', meeting)
     expect(r1.status).toBe(200)
     const up1 = (await r1.json()) as { uploadId: string; folderUrl: string; audio: { track: string; uploadUrl: string }[] }
-    const [folder] = drive.children('root-folder')
+    const [year] = drive.children('root-folder')
+    expect(year!.name).toBe('2026')
+    const [month] = drive.children(year!.id)
+    expect(month!.name).toBe('11 November')
+    const [folder] = drive.children(month!.id)
     expect(folder!.name).toBe('2026-11-18 Launch planning')
     expect(up1.folderUrl).toBe(`https://drive.google.com/drive/folders/${folder!.id}`)
     expect(up1.audio.map((a) => a.track)).toEqual(['mic', 'others'])

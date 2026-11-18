@@ -3,7 +3,7 @@ import { parseList } from '../access.js'
 import { USER_COLUMNS, revokeUserSessions, toUser, type User } from '../auth.js'
 import type { Deps, Env } from '../context.js'
 import { folderUrl, type DriveFile, type SharedDrive } from '../google.js'
-import { PLACEHOLDERS, isValidTimezone, renderPattern, validatePattern } from '../naming.js'
+import { PLACEHOLDERS, isValidTimezone, renderFolderPath, renderPattern, validatePattern } from '../naming.js'
 import { DEFAULT_MODEL, type DriveFolder, type TeamSettings } from '../settings.js'
 import { adminFromCookie } from '../routes/auth.js'
 import { formatTime, html, page, raw, type Notice, type Raw, type Section } from './layout.js'
@@ -351,7 +351,7 @@ export function adminRoutes(deps: Deps): Hono<Env> {
   <input id="teamName" type="text" name="teamName" value="${s.teamName}" required maxlength="100">
   <label for="folderPattern">Meeting folder</label>
   <input id="folderPattern" type="text" name="folderPattern" value="${s.folderPattern}" required>
-  <div class="hint">Example: <code>${renderPattern(s.folderPattern, sample)}</code></div>
+  <div class="hint">Example: <code>${renderFolderPath(s.folderPattern, sample).join(' / ')}</code>. Use <code>/</code> for nested folders, e.g. <code>{year}/{month} {monthName}/{date} {title}</code> groups meetings by year and month.</div>
   <label for="filePattern">Files</label>
   <input id="filePattern" type="text" name="filePattern" value="${s.filePattern}" required>
   <div class="hint">Example: <code>${renderPattern(s.filePattern, { ...sample, kind: 'Notes' })}</code>, <code>${renderPattern(s.filePattern, { ...sample, kind: 'mic' })}.m4a</code></div>

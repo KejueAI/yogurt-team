@@ -5,7 +5,7 @@ import { withTransaction } from './db.js'
 import { GoogleApiError, folderUrl, type DriveClient } from './google.js'
 import { matchMeeting, EVENT_MATCH_WINDOW_MS } from './matching.js'
 import { markdownToHtml } from './markdown.js'
-import { renderPattern, withExtension } from './naming.js'
+import { renderFolderPath, renderPattern, withExtension } from './naming.js'
 import type { TeamSettings } from './settings.js'
 import type { User } from './auth.js'
 
@@ -137,12 +137,16 @@ export async function resolveMeeting(
         }
         return meeting
       }
-      const folder = await drive.createFolder(meeting.folder_name, root)
+      const path = meeting.folder_name.split('/')
+      const parent = await ensureParents(drive, root, path.slice(0, -1))
+      const folder = await drive.createFolder(path[path.length - 1]!, parent)
       await tx.query('UPDATE meetings SET folder_id = $2 WHERE id = $1', [meeting.id, folder.id])
       return { ...meeting, folder_id: folder.id }
     }
-    const name = renderPattern(settings.folderPattern, { title: req.title, startedAt: req.startedAt, timezone: settings.timezone })
-    const folder = await drive.createFolder(name, root)
+    const path = renderFolderPath(settings.folderPattern, { title: req.title, startedAt: req.startedAt, timezone: settings.timezone })
+    const parent = await ensureParents(drive, root, path.slice(0, -1))
+    const folder = await drive.createFolder(path[path.length - 1]!, parent)
+    const name = path.join('/')
     const { rows } = await tx.query<MeetingRow>(
       `INSERT INTO meetings (root_folder_id, calendar_event_id, title, started_at, folder_id, folder_name)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -150,6 +154,19 @@ export async function resolveMeeting(
     )
     return rows[0]!
   })
+}
+
+/**
+ * Finds or creates the grouping folders (year, month…) above a meeting folder. They are tagged with an
+ * appProperty so a folder someone renames by hand is still found. Callers hold the root's advisory lock.
+ */
+export async function ensureParents(drive: Pick<Drive, 'createFolder' | 'findByAppProperty'>, root: string, names: string[]): Promise<string> {
+  let parent = root
+  for (const name of names) {
+    const [found] = await drive.findByAppProperty(parent, 'yogurtGroup', name)
+    parent = found ? found.id : (await drive.createFolder(name, parent, { yogurtGroup: name })).id
+  }
+  return parent
 }
 
 /** Creates the Doc, or replaces the content of the one uploaded before (moving it if needed). */

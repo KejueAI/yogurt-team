@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { cleanName, firstName, isValidTimezone, renderPattern, validatePattern, withExtension } from '../src/naming.js'
+import { cleanName, firstName, isValidTimezone, renderFolderPath, renderPattern, validatePattern, withExtension } from '../src/naming.js'
 
 const base = { title: 'Launch planning', startedAt: new Date('2026-11-18T23:30:00Z'), timezone: 'UTC', recorderName: 'Youssef Abdelsalam', recorderEmail: 'youssef@kejue.co' }
+
+describe('folder paths', () => {
+  it('nests folders by date', () => {
+    expect(renderFolderPath('{year}/{month} {monthName}/{date} {title}', base)).toEqual(['2026', '11 November', '2026-11-18 Launch planning'])
+    expect(renderFolderPath('{year}/{month} {monthName}/{date} {title}', { ...base, timezone: 'Asia/Tokyo' })).toEqual(['2026', '11 November', '2026-11-19 Launch planning'])
+  })
+  it('keeps a slash in the title from adding a level', () => {
+    expect(renderFolderPath('{year}/{title}', { ...base, title: 'Q3/Q4 review' })).toEqual(['2026', 'Q3-Q4 review'])
+  })
+  it('ignores empty levels and limits depth', () => {
+    expect(renderFolderPath('/{date}//{title}/', base)).toEqual(['2026-11-18', 'Launch planning'])
+    expect(validatePattern('a/b/c/d/e')).toMatch(/4 folder levels/)
+    expect(validatePattern('{year}/{month} {monthName}/{day} {title}')).toBeNull()
+  })
+})
 
 describe('naming', () => {
   it('renders the default patterns', () => {

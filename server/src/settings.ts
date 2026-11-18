@@ -33,7 +33,7 @@ export interface Secrets {
   openrouterKey: string | null
 }
 
-export const DEFAULT_FOLDER_PATTERN = '{date} {title}'
+export const DEFAULT_FOLDER_PATTERN = '{year}/{month} {monthName}/{date} {title}'
 export const DEFAULT_FILE_PATTERN = '{recorder} – {kind}'
 export const DEFAULT_MODEL = 'openrouter/auto'
 
