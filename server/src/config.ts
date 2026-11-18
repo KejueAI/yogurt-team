@@ -30,8 +30,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: Number(env.PORT ?? 8080) || 8080,
     databaseUrl: req('DATABASE_URL'),
     publicUrl: req('PUBLIC_URL').replace(/\/+$/, ''),
-    googleClientId: req('GOOGLE_CLIENT_ID'),
-    googleClientSecret: req('GOOGLE_CLIENT_SECRET'),
+    // Optional at boot so a fresh deploy starts and can be health-checked before Google is set up;
+    // sign-in pages explain what's missing until both are present.
+    googleClientId: env.GOOGLE_CLIENT_ID?.trim() ?? '',
+    googleClientSecret: env.GOOGLE_CLIENT_SECRET?.trim() ?? '',
     secretKey: req('SECRET_KEY'),
     adminEmails: splitList(env.ADMIN_EMAILS),
     allowedDomains: splitList(env.ALLOWED_DOMAINS).map((d) => d.replace(/^@/, '')),
@@ -42,4 +44,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (config.secretKey.length < 32) throw new Error('SECRET_KEY must be at least 32 characters')
   if (!/^https?:\/\//.test(config.publicUrl)) throw new Error('PUBLIC_URL must start with http:// or https://')
   return config
+}
+
+export function googleConfigured(config: Pick<Config, 'googleClientId' | 'googleClientSecret'>): boolean {
+  return !!config.googleClientId && !!config.googleClientSecret
 }

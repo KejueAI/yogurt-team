@@ -16,6 +16,7 @@ import {
 import type { Deps } from '../context.js'
 import { DRIVE_SCOPE } from '../google.js'
 import { messagePage } from '../admin/layout.js'
+import { googleConfigured } from '../config.js'
 
 export const ADMIN_COOKIE = 'yt_admin'
 const SIGN_IN_SCOPES = ['openid', 'email', 'profile']
@@ -38,6 +39,19 @@ export function authRoutes(deps: Deps): Hono {
   const driveRedirect = `${config.publicUrl}/auth/drive/callback`
   const cookieSecret = deps.keys.signing.toString('base64url')
   const secureCookie = config.publicUrl.startsWith('https://')
+
+  if (!googleConfigured(config)) {
+    const notReady = (c: Context) =>
+      c.html(
+        messagePage(
+          'Google sign-in is not set up yet',
+          'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server and restart it. The README explains how to create them.',
+        ),
+        503,
+      )
+    app.get('/auth/*', notReady)
+    app.get('/admin/login', notReady)
+  }
 
   // Desktop loopback sign-in: the app opens this in the browser.
   app.get('/auth/desktop/start', async (c) => {

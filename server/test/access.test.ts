@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { checkAccess, emailDomain, isBootstrapAdmin, isValidAppState, normalizeEmail, parseList, parseLoopbackPort } from '../src/access.js'
 import { bearerToken } from '../src/auth.js'
-import { loadConfig, splitList } from '../src/config.js'
+import { loadConfig, splitList, googleConfigured } from '../src/config.js'
 
 const policy = { allowedDomains: ['kejue.co'], allowlist: ['guest@gmail.com'], adminEmails: ['youssef@kejue.co'] }
 
@@ -76,6 +76,11 @@ describe('config', () => {
     expect(() => loadConfig({ ...env, SECRET_KEY: 'short' })).toThrow(/SECRET_KEY/)
     expect(() => loadConfig({ ...env, DATABASE_URL: '' })).toThrow(/DATABASE_URL/)
     expect(() => loadConfig({ ...env, PUBLIC_URL: 'team.example.com' })).toThrow(/PUBLIC_URL/)
+  })
+  it('boots without Google credentials', () => {
+    const c = loadConfig({ ...env, GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: undefined })
+    expect(googleConfigured(c)).toBe(false)
+    expect(googleConfigured(loadConfig(env))).toBe(true)
   })
   it('splits lists', () => {
     expect(splitList(' a, b ;c\n')).toEqual(['a', 'b', 'c'])
