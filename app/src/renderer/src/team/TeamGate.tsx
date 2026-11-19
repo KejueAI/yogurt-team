@@ -29,12 +29,11 @@ export function TeamGate({ state }: { state: TeamState }) {
     const r = await window.yogurtTeam.signIn().catch((e: unknown) => ({ ok: false, error: String(e) }))
     if (!r.ok && r.error) setError(r.error)
   }
-  const host = (() => { try { return new URL(state.serverUrl).host } catch { return state.serverUrl } })()
   return (
     <Layout testId="team-gate" step="team-sign-in" motionKey="team-gate"
       art={<WelcomeArt />}
       title="Sign in to your team"
-      text={`Yogurt Team saves your meetings to your team's Google Drive. Sign in with your work Google account to start (${host}).`}
+      text="Yogurt Team saves your meetings to your team's Google Drive. Sign in with your work Google account to start."
       actions={<>
         <button type="button" data-testid="team-gate-sign-in" onClick={() => void signIn()} disabled={busy} className="ob-button primary no-drag">
           {busy ? 'Waiting for Google…' : 'Sign in with Google'}
