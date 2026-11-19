@@ -34,10 +34,23 @@ jobs:
             git reset --hard upstream/main
             echo "conflict=true" >> "$GITHUB_OUTPUT"
           fi
-          git push -f origin upstream-sync
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          # GitHub won't let Actions push changes to .github/workflows/; those merges are done by hand
+          if ! git push -f origin upstream-sync 2>push.err; then
+            cat push.err
+            grep -q "workflows. permission" push.err || exit 1
+            echo "manual=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Ask for a manual merge
+        if: steps.merge.outputs.manual == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body="Upstream changed files under .github/workflows/, which GitHub doesn't let Actions push. Merge it locally: git fetch upstream && git merge upstream/main && git push (FORK.md lists the files the fork edits)."
+          open=$(gh issue list --state open --search "Sync with upstream Yogurt in:title" --json number -q '.[0].number')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "$body"; else gh issue create --title "Sync with upstream Yogurt" --body "$body"; fi
       - name: Open or update the pull request
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.changed == 'true' && steps.merge.outputs.manual != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

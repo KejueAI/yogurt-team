@@ -125,7 +125,8 @@ jobs:
       # Ubuntu 24.04 blocks the user namespaces Electron's sandbox needs
       - name: Let Electron start (Linux)
         if: runner.os == 'Linux'
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        # yogurt-team: Blacksmith's Linux runners don't have this setting, so there's nothing to turn off there
+        run: if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0; fi
       - name: End-to-end tests
         shell: bash
         # the specs tagged @everywhere (launch, and the Mac-only features hidden); windows are shown, hidden ones pause animation frames here
