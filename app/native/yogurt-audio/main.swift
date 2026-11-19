@@ -1286,6 +1286,92 @@ if args.count >= 4, args[1] == "mix", let outArg = argValue("--out") {
   guard out.writerCompleted else { fail("mix: could not write \(outURL.lastPathComponent)") }
   exit(0)
 }
+// Yogurt Team: squeeze --out FILE IN writes only a track's speech (pauses of 2 s or more cut, 0.5 s kept around speech)
+// for the speech-to-text service, which bills every minute it is sent. It prints the kept stretches on the input's
+// time as {"ranges":[[startMs,endMs],...],"durationMs":N} so timestamps map back, or {"skipped":true,...} when cutting
+// would save under a fifth (the input is then sent as it is). Same rules as the Windows and Linux helpers' squeeze.rs.
+func squeezeReader(_ url: URL) -> (AVAssetReader, AVAssetReaderTrackOutput) {
+  let asset = AVURLAsset(url: url)
+  guard let src = asset.tracks(withMediaType: .audio).first, let reader = try? AVAssetReader(asset: asset) else { fail("squeeze: can't read \(url.lastPathComponent)") }
+  let o = AVAssetReaderTrackOutput(track: src, outputSettings: [
+    AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48000, AVNumberOfChannelsKey: 1,
+    AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false, AVLinearPCMIsBigEndianKey: false,
+  ])
+  guard reader.canAdd(o) else { fail("squeeze: can't decode \(url.lastPathComponent)") }
+  reader.add(o)
+  guard reader.startReading() else { fail("squeeze: can't read \(url.lastPathComponent)") }
+  return (reader, o)
+}
+func squeezeEach(_ url: URL, _ body: (UnsafeBufferPointer<Float>) -> Void) {
+  let (reader, o) = squeezeReader(url)
+  while let sb = o.copyNextSampleBuffer() {
+    let frames = CMSampleBufferGetNumSamples(sb)
+    guard frames > 0, let b = AVAudioPCMBuffer(pcmFormat: mono48, frameCapacity: AVAudioFrameCount(frames)) else { continue }
+    b.frameLength = AVAudioFrameCount(frames)
+    if CMSampleBufferCopyPCMDataIntoAudioBufferList(sb, at: 0, frameCount: Int32(frames), into: b.mutableAudioBufferList) != noErr { fail("squeeze: bad audio") }
+    body(UnsafeBufferPointer(start: b.floatChannelData![0], count: frames))
+  }
+  if reader.status == .failed { fail("squeeze: can't read \(url.lastPathComponent)") }
+}
+/** speech stretches, in 20 ms frames: louder than 9 dB over the quietest tenth (and over -55 dB), pauses up to 2 s joined, 0.5 s either side */
+func speechFrames(_ levels: [Double]) -> [(Int, Int)] {
+  if levels.isEmpty { return [] }
+  let floor = levels.sorted()[levels.count / 10]
+  let threshold = max(floor + 9, -55)
+  var runs: [(Int, Int)] = []
+  for (i, l) in levels.enumerated() where l >= threshold {
+    if let last = runs.last, i - last.1 <= 100 { runs[runs.count - 1].1 = i + 1 } else { runs.append((i, i + 1)) }
+  }
+  var out: [(Int, Int)] = []
+  for (a0, b0) in runs {
+    let a = max(0, a0 - 25), b = min(levels.count, b0 + 25)
+    if let last = out.last, a <= last.1 { out[out.count - 1].1 = max(last.1, b) } else { out.append((a, b)) }
+  }
+  return out
+}
+if args.count == 5, args[1] == "squeeze", let outArg = argValue("--out"), args[4] != outArg {
+  let input = URL(fileURLWithPath: args[4]), frame = 960
+  var levels: [Double] = [], acc = 0.0, n = 0, total = 0
+  let db = { (s: Double, n: Int) -> Double in n == 0 || s <= 0 ? -120 : 10 * log10(s / Double(n)) }
+  squeezeEach(input) { p in
+    for x in p { acc += Double(x) * Double(x); n += 1; if n == frame { levels.append(db(acc, n)); acc = 0; n = 0 } }
+    total += p.count
+  }
+  if n > 0 { levels.append(db(acc, n)) }
+  let durationMs = total * 1000 / 48000
+  let frames = speechFrames(levels)
+  let kept = frames.reduce(0) { $0 + $1.1 - $1.0 }
+  if levels.isEmpty || Double(kept) > Double(levels.count) * 0.8 { print("{\"skipped\":true,\"durationMs\":\(durationMs)}"); exit(0) }
+  let ranges = frames.map { ($0.0 * frame, min($0.1 * frame, total)) }
+  if !ranges.isEmpty {
+    let outURL = URL(fileURLWithPath: outArg)
+    try? FileManager.default.removeItem(at: outURL)
+    let out = Track("squeeze", file: outURL)
+    out.openWriter()
+    var pos = 0, ri = 0
+    squeezeEach(input) { p in
+      var keep: [Float] = []
+      for (k, x) in p.enumerated() {
+        let at = pos + k
+        while ri < ranges.count && at >= ranges[ri].1 { ri += 1 }
+        if ri < ranges.count && at >= ranges[ri].0 { keep.append(x) }
+      }
+      pos += p.count
+      guard !keep.isEmpty, let b = AVAudioPCMBuffer(pcmFormat: mono48, frameCapacity: AVAudioFrameCount(keep.count)) else { return }
+      b.frameLength = AVAudioFrameCount(keep.count)
+      keep.withUnsafeBufferPointer { b.floatChannelData![0].update(from: $0.baseAddress!, count: keep.count) }
+      out.write(b)
+    }
+    let g = DispatchGroup()
+    out.finish(g)
+    g.wait()
+    guard out.writerCompleted else { fail("squeeze: could not write \(outURL.lastPathComponent)") }
+  }
+  let ms = { (f: Int) in min(f * frame, total) * 1000 / 48000 }
+  let list = frames.map { "[\(ms($0.0)),\(ms($0.1))]" }.joined(separator: ",")
+  print("{\"ranges\":[\(list)],\"durationMs\":\(durationMs)}")
+  exit(0)
+}
 guard args.count >= 4, (args[1] == "record" || args[1] == "join" || args[1] == "inspect" || args[1] == "compact"), let dirArg = argValue("--dir") else {
   fail("usage: yogurt-audio record --dir DIR [--part N --start-ms X] [--speech LOCALE] | join --dir DIR | inspect --dir DIR | compact --dir DIR --out STAGING | speech-locales | speech-install LOCALE")
 }

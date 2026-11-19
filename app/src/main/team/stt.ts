@@ -3,7 +3,7 @@
 // is sent on its own, so lines keep who said them without diarization, and the result replaces Whisper's lines
 // before the summary is written. Any failure keeps Whisper's transcript as it is.
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, statSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AudioExt } from '../audio'
@@ -112,6 +112,35 @@ export type RemoteTranscriptionDeps = {
   sleep?: (ms: number) => Promise<void>
   /** how long to wait for one track's job before keeping Whisper's lines */
   jobTimeoutMs?: number
+  /**
+   * Writes only a track's speech to out (the audio helper's `squeeze`), since the service bills every minute sent;
+   * ranges are where the kept audio was in the track. Skipped: too little silence to be worth it (send the track).
+   */
+  squeeze?: (input: string, out: string) => Promise<Squeezed>
+}
+
+export type Squeezed = { skipped: true } | { ranges: [number, number][] }
+
+/** a time in the squeezed audio → the same moment in the whole track (ranges: the kept parts, in order) */
+export function unsqueeze(ranges: readonly (readonly [number, number])[]): (ms: number) => number {
+  const starts: number[] = []
+  let at = 0
+  for (const [a, b] of ranges) { starts.push(at); at += b - a }
+  return (ms) => {
+    let i = starts.length - 1
+    while (i > 0 && starts[i] > ms) i--
+    if (i < 0) return ms
+    const [a, b] = ranges[i]
+    return Math.min(a + (ms - starts[i]), b)
+  }
+}
+
+function mapResult(r: SttResult, to: (ms: number) => number): SttResult {
+  return {
+    ...r,
+    words: r.words?.map(w => ({ ...w, start_ms: w.start_ms == null ? null : to(w.start_ms), end_ms: w.end_ms == null ? null : to(w.end_ms) })),
+    chunks: r.chunks?.map(c => ({ ...c, start_ms: to(c.start_ms), end_ms: to(c.end_ms) })),
+  }
 }
 
 const sizeOf = (path: string) => { try { return statSync(path).size } catch { return -1 } }
@@ -189,7 +218,31 @@ export function createRemoteTranscription(d: RemoteTranscriptionDeps) {
     }
   }
 
-  async function transcribeTrack(api: Api, file: AudioFile, lang: Lang, nonce: string): Promise<Line[]> {
+  /** the track's speech only, when the helper can make it; null = it has none at all */
+  async function squeezed(file: AudioFile): Promise<{ file: AudioFile; to: (ms: number) => number; cleanup: () => void } | null | undefined> {
+    if (!d.squeeze) return undefined
+    const out = `${file.path}.speech${file.path.slice(file.path.lastIndexOf('.'))}`
+    const cleanup = () => { try { rmSync(out, { force: true }) } catch { /* gone */ } }
+    try {
+      const r = await d.squeeze(file.path, out)
+      if ('skipped' in r) { cleanup(); return undefined }
+      if (!r.ranges.length) { cleanup(); return null }
+      const size = sizeOf(out)
+      if (size <= 0) { cleanup(); return undefined }
+      return { file: { ...file, path: out, size }, to: unsqueeze(r.ranges), cleanup }
+    } catch (e) {
+      cleanup(); log(`[team] couldn't cut the silence out of ${file.track}; sending all of it`, e)
+      return undefined
+    }
+  }
+
+  async function transcribeTrack(api: Api, whole: AudioFile, lang: Lang, nonce: string): Promise<Line[]> {
+    const sq = await squeezed(whole)
+    if (sq === null) return [] // silence throughout: nothing to send or pay for
+    try { return await transcribeFile(api, sq?.file ?? whole, lang, nonce, sq?.to) } finally { sq?.cleanup() }
+  }
+
+  async function transcribeFile(api: Api, file: AudioFile, lang: Lang, nonce: string, to?: (ms: number) => number): Promise<Line[]> {
     const key = (step: string) => `yt-${nonce}-${file.track}-${step}`
     const deadline = Date.now() + (d.jobTimeoutMs ?? 60 * 60_000)
     const uploadId = await sendFile(api, file, key)
@@ -203,7 +256,8 @@ export function createRemoteTranscription(d: RemoteTranscriptionDeps) {
         if (Date.now() > deadline) throw new GiveUp(`the transcription service took too long on ${file.track}`)
         await sleep(POLL_MS[Math.min(i, POLL_MS.length - 1)])
       }
-      const r = await api.sttResult(jobId)
+      const got = await api.sttResult(jobId)
+      const r = to ? mapResult(got, to) : got
       if (r.words?.length) return linesFromWords(r.words, file.track as Track)
       if (r.chunks?.length) return linesFromChunks(r.chunks, file.track as Track)
       return []

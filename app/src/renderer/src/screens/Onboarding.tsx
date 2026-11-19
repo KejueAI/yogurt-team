@@ -48,7 +48,7 @@ type Progress = { n: number; total: number }
  * buttons sit in the same place on every screen; the note under the buttons has its own room so nothing moves.
  * motionKey: a change fades the words in again; its part before ":" does the same for the picture.
  */
-function Layout({ testId, step, kind, motionKey, art, title, text, textTestId = 'step-reason', actions, note, progress, state }: {
+export function Layout({ testId, step, kind, motionKey, art, title, text, textTestId = 'step-reason', actions, note, progress, state }: {
   testId: string; step?: string; kind?: string; motionKey: string; art: ReactNode; title: string; text: string; textTestId?: string
   actions: ReactNode; note?: ReactNode; progress?: Progress; state?: SetupState
 }) {

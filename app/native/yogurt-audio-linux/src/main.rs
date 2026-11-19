@@ -13,6 +13,7 @@
 
 mod join;
 mod mix; // Yogurt Team
+mod squeeze; // Yogurt Team
 mod json;
 mod ogg_opus;
 mod pulse;
@@ -303,6 +304,11 @@ fn main() {
         "mix" => match arg_value(&args, "--out") {
             Some(o) => { let ins: Vec<PathBuf> = args[2..].iter().filter(|a| a.as_str() != "--out" && a.as_str() != o).map(PathBuf::from).collect(); if let Err(e) = mix::mix(Path::new(&o), &ins) { fail(&e) } return }
             None => fail("mix: --out is required"),
+        },
+        // Yogurt Team: only a track's speech, for the speech-to-text service (it bills every minute sent)
+        "squeeze" => match (arg_value(&args, "--out"), args.last()) {
+            (Some(o), Some(i)) if args.len() == 5 && i != &o => { if let Err(e) = squeeze::squeeze(Path::new(&o), Path::new(i)) { fail(&e) } return }
+            _ => fail("usage: squeeze --out FILE IN"),
         },
         _ => {}
     }

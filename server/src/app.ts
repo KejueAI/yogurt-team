@@ -4,6 +4,7 @@ import { adminRoutes } from './admin/routes.js'
 import { apiError, type Deps, type Env } from './context.js'
 import { apiRoutes } from './routes/api.js'
 import { authRoutes } from './routes/auth.js'
+import { downloadRoutes } from './download.js'
 
 export function createApp(deps: Deps): Hono<Env> {
   const app = new Hono<Env>()
@@ -16,7 +17,8 @@ export function createApp(deps: Deps): Hono<Env> {
       return c.json({ ok: false }, 503)
     }
   })
-  app.get('/', (c) => c.redirect('/admin'))
+  // the public download page for the desktop app
+  app.route('/', downloadRoutes(deps))
 
   // Sign-in routes go first so /admin/login and friends are reachable without a session.
   app.route('/', authRoutes(deps))

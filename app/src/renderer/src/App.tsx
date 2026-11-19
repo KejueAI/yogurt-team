@@ -18,10 +18,12 @@ import { BootScreen } from './components/BootScreen'
 import { bootHoldMs } from '../../shared/onboarding'
 import { Folder } from './screens/Folder'
 import { useFolders } from './folders'
+import { TeamGate, teamGateNeeded, useTeamState } from './team/TeamGate'
 import type { LibrarySource, MeetingView, OnboardingPlan, SetupState } from '../../shared/types'
 
 export function App() {
   const [setup, setSetup] = useState<SetupState>()
+  const team = useTeamState() // yogurt-team: signed out of a team server = only the sign-in screen
   // where the app was told to go, e.g. /note/<id>
   const [route, setRouteNow] = useState('')
   const [agendaJump, setAgendaJump] = useState<{ at: number }>()
@@ -172,6 +174,7 @@ export function App() {
 
   // still starting, or checking what is on disk: the launch screen, so a finished install never flashes the first-run screen
   if (!setup || !plan || holding) return <div data-testid="app-shell" className="h-full bg-bg"><TitleBar /><BootScreen /></div>
+  if (team && teamGateNeeded(team)) return <div data-testid="app-shell" className="h-full bg-bg"><TitleBar /><TeamGate state={team} /></div>
   const noteId = route.startsWith('/note/') ? route.slice(6) : null
   const settings = route === '/settings' || route.startsWith('/settings/')
   const trash = route === '/trash'

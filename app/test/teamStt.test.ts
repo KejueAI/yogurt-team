@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
-import { DONE_FILE, carryOver, createRemoteTranscription, linesFromChunks, linesFromWords, sttLanguage } from '../src/main/team/stt'
+import { DONE_FILE, carryOver, createRemoteTranscription, linesFromChunks, linesFromWords, sttLanguage, unsqueeze, type Squeezed } from '../src/main/team/stt'
 
 const roots: string[] = [], stores: Store[] = []
 afterEach(() => { for (const s of stores.splice(0)) s.close(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }) })
@@ -43,6 +43,13 @@ describe('linesFromChunks', () => {
   })
 })
 
+describe('unsqueeze', () => {
+  it('puts a time in the speech-only audio back where it was in the track', () => {
+    const to = unsqueeze([[1000, 3000], [10_000, 11_000], [20_000, 25_000]])
+    expect([0, 1999, 2000, 2500, 3000, 7999, 8000].map(to)).toEqual([1000, 2999, 10_000, 10_500, 20_000, 24_999, 25_000])
+  })
+})
+
 describe('carryOver', () => {
   it('keeps the call names on them lines and hides the echo on me lines', () => {
     const old = [
@@ -61,7 +68,7 @@ describe('carryOver', () => {
   })
 })
 
-function setup(o: { enabled?: boolean; jobStatus?: string[]; result?: unknown; busyJobs?: number; jobError?: boolean } = {}) {
+function setup(o: { enabled?: boolean; jobStatus?: string[]; result?: unknown; busyJobs?: number; jobError?: boolean; squeeze?: (input: string, out: string) => Promise<Squeezed> } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'yogurt-stt-')); roots.push(root)
   const store = openStore(join(root, 'yogurt.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Sync', startedAt: 0, endedAt: 60_000, eventId: null, app: null, state: 'done', attendees: [] })
@@ -98,12 +105,41 @@ function setup(o: { enabled?: boolean; jobStatus?: string[]; result?: unknown; b
   const changed: string[] = []
   const rt = createRemoteTranscription({
     session: { serverUrl: () => 'https://team.example', token: async () => 'tok', signedIn: () => true, transcriptionEnabled: async () => o.enabled ?? true },
-    store, dirOf: () => dir, audioKinds: () => ['m4a'], changed: id => changed.push(id), fetch: fetchImpl, sleep: async () => {},
+    store, dirOf: () => dir, audioKinds: () => ['m4a'], changed: id => changed.push(id), fetch: fetchImpl, sleep: async () => {}, squeeze: o.squeeze,
   })
   return { store, m, dir, calls, rt, changed }
 }
 
 describe('createRemoteTranscription', () => {
+  it('sends only the speech when the helper can cut the silence out, and maps the times back', async () => {
+    const squeezed: string[] = []
+    const { store, m, dir, calls, rt } = setup({
+      squeeze: async (input, out) => {
+        squeezed.push(out)
+        if (input.endsWith('them.m4a')) return { skipped: true }
+        writeFileSync(out, Buffer.alloc(3, 1)); return { ranges: [[50_000, 60_000]] }
+      },
+    })
+    expect(await rt.finish(m.id)).toBe(true)
+    // me: 3 bytes sent in one part (not 10); them: all 6 bytes in two
+    expect(calls.filter(c => c.url.startsWith('https://bucket/')).length).toBe(3)
+    expect(store.segments(m.id).map(s => [s.track, s.startMs])).toEqual([['them', 2000], ['me', 50_100]])
+    expect(squeezed.every(p => !existsSync(p))).toBe(true)
+    expect(existsSync(join(dir, 'me.m4a'))).toBe(true)
+  })
+
+  it('sends nothing for a track that is silent throughout', async () => {
+    const { m, calls, rt } = setup({ squeeze: async (input) => input.endsWith('me.m4a') ? { ranges: [] } : { skipped: true } })
+    expect(await rt.finish(m.id)).toBe(true)
+    expect(calls.filter(c => c.url.endsWith('/api/stt/uploads')).length).toBe(1)
+  })
+
+  it('sends the whole track when cutting the silence fails', async () => {
+    const { m, calls, rt } = setup({ squeeze: async () => { throw new Error('helper crashed') } })
+    expect(await rt.finish(m.id)).toBe(true)
+    expect(calls.filter(c => c.url.startsWith('https://bucket/')).length).toBe(5)
+  })
+
   it('sends each track on its own, then replaces the transcript', async () => {
     const { store, m, dir, calls, rt, changed } = setup()
     expect(await rt.finish(m.id)).toBe(true)

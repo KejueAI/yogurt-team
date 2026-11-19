@@ -56,7 +56,13 @@ export function hookTeam(d: TeamDeps) {
   session.onChange(send)
   const remote = createRemoteTranscription({
     session, store: d.store, dirOf: d.dirOf, audioKinds: d.audioKinds, changed: d.transcriptChanged,
-    log: (msg) => console.log(msg),
+    log: (msg, err) => err === undefined ? console.log(msg) : console.warn(msg, err),
+    squeeze: (input, out) => new Promise((resolve, reject) => {
+      execFile(audioHelperPath(), ['squeeze', '--out', out, input], { timeout: 30 * 60_000, windowsHide: true }, (error, stdout, stderr) => {
+        if (error) return reject(new Error(String(stderr).trim() || error.message))
+        try { resolve(JSON.parse(String(stdout).trim().split('\n').pop() ?? '')) } catch (e) { reject(e) }
+      })
+    }),
   })
 
   const state = (): TeamState => session.state()

@@ -13,6 +13,8 @@ export interface Config {
   kejueApiKey?: string
   kejueApiUrl: string
   kejueSttModel: string
+  /** GitHub repo (owner/name) whose latest release the download page offers */
+  downloadsRepo: string
 }
 
 export function splitList(value: string | undefined): string[] {
@@ -46,6 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     kejueApiKey: env.KEJUE_API_KEY?.trim() || undefined,
     kejueApiUrl: (env.KEJUE_API_URL?.trim() || 'https://api.kejue.co/v1').replace(/\/+$/, ''),
     kejueSttModel: env.KEJUE_STT_MODEL?.trim() || 'kejue-stt',
+    downloadsRepo: env.DOWNLOADS_REPO?.trim() || 'KejueAI/yogurt-team',
   }
   if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
   if (config.secretKey.length < 32) throw new Error('SECRET_KEY must be at least 32 characters')

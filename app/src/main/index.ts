@@ -65,6 +65,8 @@ import { UtilityEngine } from './engine'
 import { createNotesModel } from './notes/model'
 import { createTeamNotes } from './team/llm'
 import { teamSession } from './team/session'
+// yogurt-team: with a team server set, nothing records until someone signs in (the window shows only the sign-in screen)
+const teamLocked = () => !!teamSession.serverUrl() && !teamSession.signedIn()
 import { FakeEngine } from './notes/fake'
 import { hookNotes } from './notes'
 import { hookReadAhead, readAheadAllowed } from './notes/readAhead'
@@ -302,7 +304,7 @@ function startDetection() {
     autoStop: (m) => { widget.callEnded(m.id); stopMeeting(m.id); prompts.stopped(m) },
     autoStopOn: () => stopsWhenCallEnds(loadSettings(join(userDataDir(), 'settings.json'))),
     // no "Take notes?" while onboarding is still on screen
-    ready: () => !onboardingShowing(),
+    ready: () => !onboardingShowing() && !teamLocked(),
     // fake mode: tests can shorten the grace
     graceMs: isFake() && process.env.YOGURT_FAKE_CALL_GONE_MS ? Number(process.env.YOGURT_FAKE_CALL_GONE_MS) : CALL_GONE_MS,
   })
@@ -338,6 +340,7 @@ function startDetection() {
   sendWidgetTranscript = widget.transcript
   /** The one way notes start: the card's Take notes, and home's Start notes and New note. Opens the note. */
   function begin(p: { title: string; event: CalEvent | null; app: string | null }) {
+    if (teamLocked()) { goTo('/'); throw new Error('sign in to your team first') }
     const alreadyRecording = !!activeMeeting()
     const m = startMeeting(p)
     const resume = resumesNote(m)
@@ -1084,7 +1087,8 @@ app.whenReady().then(() => {
   ipcMain.handle('nav:take-ask', () => { const pending = pendingAsk; pendingAsk = false; return pending })
   // opened by the Mac at login: just the menu bar, until a call or a click
   // opened by an AI app's yogurt-mcp off a Mac (--hidden): the same, so no window jumps in front of it
-  if (!openedAtLogin() && !startedHidden(process.platform, process.argv)) createWindow()
+  // yogurt-team: signed out of a team server, the sign-in screen opens even at login (nothing records until then)
+  if (teamLocked() || (!openedAtLogin() && !startedHidden(process.platform, process.argv))) createWindow()
   startDetection()
   void setup.start()
   // new versions from GitHub Releases, downloaded in the background and installed on quit
