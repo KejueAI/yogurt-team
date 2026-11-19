@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { verifyWalkthroughFrames } from './walkthrough-frames.mjs'
 import assert from 'node:assert/strict'
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -41,6 +42,7 @@ try {
     return result.result.value
   }
   await call('Page.enable'); await call('Runtime.enable')
+  await verifyWalkthroughFrames(call, origin)
   const {createRequire}=await import('node:module')
   const require=createRequire(await fs.realpath(path.join(site,'node_modules/next/package.json'))),sharp=require('sharp')
   const {beats,timing}=await import('../renderer/timeline.mjs')
@@ -68,6 +70,8 @@ try {
     assert(resting.summaryFits && resting.lastLineVisible,'the complete Summary fits above the bottom fade')
   }
   assert.deepEqual(errors,[],'live Summary and Ask have no runtime errors')
+  const { verifyFaqClearance } = await import('./faq-clearance.test.mjs')
+  await verifyFaqClearance(call, origin)
   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'},{name:'prefers-reduced-motion',value:'reduce'}]})
   const images={}
   const {createHash}=await import('node:crypto')
@@ -82,6 +86,11 @@ try {
       console.log(name,beat,JSON.stringify(info))
       assert.deepEqual(errors,[],'the generated frame has no runtime errors')
       assert.equal(info.ready,'true','real renderer fixture is ready')
+      const titleCenters = await evaluate(`['.marketing-traffic i', '.workspace-sidebar-toggle', 'button[aria-label="Back"]'].map(selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect()
+        return rect.top + rect.height / 2
+      })`)
+      for (const center of titleCenters.slice(1)) assert(Math.abs(titleCenters[0] - center) <= 1, 'window buttons align with the title bar')
       assert(!info.text.includes('Planned'));assert(!info.overflow)
       assert.equal(info.bg.toLowerCase(),'#1b1b1d','only the frame is forced to app dark')
       assert(!info.text.includes('Let the others'),'no recording reminder in the demonstration')
@@ -110,23 +119,25 @@ try {
   }
   await call('Emulation.setDefaultBackgroundColorOverride',{color:{r:0,g:0,b:0,a:0}})
   for (const kind of ['transcript','summary','ask']) {
-    for (const [device,width] of [['desktop',354],['phone',320]]) {
-      const height=device==='phone'?280:304
-      await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:false})
-      await call('Page.navigate',{url:origin+`/marketing/app/frame.html?fragment=${kind}&still=99`})
-      await pause(900)
-      assert.deepEqual(errors,[],'fragment components have no runtime errors')
-      const info=await evaluate(`(()=>{const e=document.querySelector('.marketing-fragment'),r=e.getBoundingClientRect();return {ready:document.documentElement.dataset.ready,text:e.innerText,top:r.top,bottom:r.bottom,bg:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()}})()`)
-      console.log(kind,device,JSON.stringify(info))
-      assert.equal(info.ready,'true');assert(info.top>=0&&info.bottom<=height,'fragment must fit at the app type size')
-      assert.notEqual(info.bg.toLowerCase(),'#1b1b1d','fragments stay light')
-      if(kind==='ask')assert.equal(await evaluate("document.querySelectorAll('[data-testid=source-citation]').length"),1)
-      const file=`fragment-${kind}-${device}.webp`
-      const png=Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64'),bytes=await sharp(png).webp({quality:90}).toBuffer()
-      await fs.writeFile(path.join(site,'public/marketing/stills',file),bytes)
-      images[file]={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}
+    for (const theme of ['light','dark']) {
+      for (const [device,width,height] of [['desktop',420,250],['phone',320,280]]) {
+        await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:false})
+        await call('Page.navigate',{url:origin+`/marketing/app/frame.html?fragment=${kind}&still=99&theme=${theme}`})
+        await pause(900)
+        assert.deepEqual(errors,[],'fragment components have no runtime errors')
+        const info=await evaluate(`(()=>{const e=document.querySelector('.marketing-fragment'),r=e.getBoundingClientRect();return {ready:document.documentElement.dataset.ready,text:e.innerText,top:r.top,bottom:r.bottom,bg:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()}})()`)
+        console.log(kind,device,JSON.stringify(info))
+        assert.equal(info.ready,'true');assert(info.top>=0&&info.bottom<=height,'fragment must fit at the app type size')
+        assert.equal(info.bg.toLowerCase()==='#1b1b1d',theme==='dark','fragments follow the requested theme')
+        if(kind==='ask')assert.equal(await evaluate("document.querySelectorAll('[data-testid=source-citation]').length"),1)
+        const file=`fragment-${kind}${theme==='dark'?'-dark':''}-${device}.webp`
+        const png=Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64'),bytes=await sharp(png).webp({quality:90}).toBuffer()
+        await fs.writeFile(path.join(site,'public/marketing/stills',file),bytes)
+        images[file]={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}
+      }
     }
   }
+
   const manifest=JSON.parse(await fs.readFile(path.join(site,'public/marketing/app/manifest.json'),'utf8'))
   await fs.writeFile(path.join(site,'public/marketing/stills/manifest.json'),JSON.stringify({appCommit:manifest.appCommit,bundleSha256:manifest.files['renderer.js'].sha256,bundleCssSha256:manifest.files['renderer.css'].sha256,generatedAt:new Date().toISOString(),images},null,2)+'\n')
 
