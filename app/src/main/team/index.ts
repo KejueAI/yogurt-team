@@ -9,6 +9,7 @@ import { audioHelperPath } from '../capture'
 import type { AudioExt } from '../audio'
 import type { Store } from '../store'
 import { bindTeamSession, TeamSession } from './session'
+import { createRemoteTranscription } from './stt'
 import { TeamFile, type Sealer } from './teamFile'
 import type { TeamMeetingState, TeamState } from './types'
 import { UploadQueue } from './uploads'
@@ -29,12 +30,14 @@ const httpUrl = (u: string | undefined): u is string => { try { return !!u && /^
 
 export type TeamDeps = {
   userDataDir: string
-  store: Pick<Store, 'meeting' | 'notes' | 'segments'>
+  store: Pick<Store, 'meeting' | 'notes' | 'segments' | 'replaceSegments'>
   dirOf: (id: string) => string
   audioKinds: () => readonly AudioExt[]
   /** upstream's automatic recording deletion: removeRecording(id, true) */
   removeRecording: (id: string) => unknown
   window: () => BrowserWindow | undefined
+  /** the transcript was replaced by the team's transcription service: the window and search should look again */
+  transcriptChanged: (meetingId: string) => void
 }
 
 export function hookTeam(d: TeamDeps) {
@@ -51,6 +54,10 @@ export function hookTeam(d: TeamDeps) {
     }),
   }))
   session.onChange(send)
+  const remote = createRemoteTranscription({
+    session, store: d.store, dirOf: d.dirOf, audioKinds: d.audioKinds, changed: d.transcriptChanged,
+    log: (msg) => console.log(msg),
+  })
 
   const state = (): TeamState => session.state()
   const meeting = (id: unknown): TeamMeetingState => getQueue().meetingState(String(id))
@@ -85,6 +92,11 @@ export function hookTeam(d: TeamDeps) {
      * deletes the recording now or once its audio is sent.
      */
     summarized(id: string) { getQueue().summarized(id) },
+    /**
+     * After Whisper's transcript is finished: the team's transcription service writes the meeting's transcript
+     * (each track sent on its own) before names and notes are worked out. Resolves either way; never throws.
+     */
+    transcribe(id: string): Promise<boolean> { return remote.finish(id) },
     stop() { queue?.stop() },
   }
 }

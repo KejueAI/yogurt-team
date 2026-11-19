@@ -91,6 +91,8 @@ describe.skipIf(!url)('server against Postgres', () => {
     adminEmails: ['boss@kejue.co'],
     allowedDomains: ['kejue.co'],
     secretKey: 'x'.repeat(40),
+    kejueApiUrl: 'https://stt.example.com/v1',
+    kejueSttModel: 'kejue-stt',
   }
 
   const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {

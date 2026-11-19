@@ -549,10 +549,13 @@ app.whenReady().then(() => {
   const me = () => loadSettings(settingsFile).myName?.trim() || macName()
   setOwnerName(me)
   setJargon(() => cleanJargon(loadSettings(settingsFile).jargon))
+  // Yogurt Team: the team's transcription service rewrites a finished meeting's transcript before names and notes (set once hookTeam runs)
+  let teamTranscribe: ((id: string) => Promise<boolean>) | undefined
+  const teamTranscribed = (id: string) => teamTranscribe?.(id) ?? Promise.resolve(false)
   // names from the call: the call app is read while a meeting records, and each line of the other side gets the name talking then
   const callNames = hookCallNames({
     store, watch: !caps.callNames ? () => ({ stop() {} }) : isFake() ? fakeCallWatch : helperWatch(helperPath), myNames: () => [me(), macName()],
-    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id); await teamTranscribed(id) },
     // people seen in the call joined the meeting: unedited notes already written get written again for them
     changed: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id); win?.webContents.send('meetings:changed'); notes.applyPeople(id) },
     onStart: onMeetingStart, onStop: onMeetingStop, onCapture: onCaptureStart, onBind: onMeetingBound,
@@ -632,7 +635,7 @@ app.whenReady().then(() => {
   // the meeting is read into the model as it happens, so its notes start within seconds of stopping
   const readAhead = hookReadAhead({
     store, queue, model, live: readsAhead, backlogMs: transcriptionBacklogMs, language: meetingLanguage,
-    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) }, onStart: onMeetingStart, onStop: onMeetingStop,
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id); await teamTranscribed(id) }, onStart: onMeetingStart, onStop: onMeetingStop,
   })
   const folderSuggestions = createFolderSuggestions({ store, queue, model, changed: () => win?.webContents.send('folders:changed') })
   let resumingId: string | null = null
@@ -644,14 +647,18 @@ app.whenReady().then(() => {
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
   // Yogurt Team: uploads summarized meetings; the automatic recording deletion waits for the audio upload
-  const team = hookTeam({ userDataDir: userDataDir(), store, dirOf: id => join(userDataDir(), 'meetings', id), audioKinds: () => audioKinds, removeRecording: id => removeRecording(id, true), window: () => win })
+  const team = hookTeam({
+    userDataDir: userDataDir(), store, dirOf: id => join(userDataDir(), 'meetings', id), audioKinds: () => audioKinds, removeRecording: id => removeRecording(id, true), window: () => win,
+    transcriptChanged: id => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id); win?.webContents.send('meetings:changed'); void indexer.schedule() },
+  })
+  teamTranscribe = id => team.transcribe(id)
   const notes = hookNotes({
     summarized: id => { folderSuggestions.schedule(id); team.summarized(id) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
     summaryLanguage: () => summaryLanguageSetting(loadSettings(settingsFile)),
     store, queue, model, language: meetingLanguage, onStop: onMeetingStopSaved, named: (id) => callNames.finished(id), earlier: (id) => readAhead.parts(id), me,
-    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id); await teamTranscribed(id) },
     send: (v) => win?.webContents.send('notes:changed', v),
     // the notes are written: the meeting goes into the library for chat across meetings
     changed: () => { win?.webContents.send('meetings:changed'); void indexer.schedule() },

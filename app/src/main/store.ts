@@ -397,6 +397,19 @@ export class Store {
       this.db.exec('COMMIT')
     } catch (e) { this.db.exec('ROLLBACK'); throw e }
   }
+  /** Yogurt Team: the meeting's whole transcript swapped for another (a better transcription of the same audio), in one step */
+  replaceSegments(meetingId: string, segs: Omit<Segment, 'id' | 'meetingId'>[]) {
+    const ins = this.db.prepare('INSERT INTO segments (meeting_id, track, start_ms, end_ms, text, speaker, hidden, echo_confident) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    this.db.exec('BEGIN')
+    try {
+      this.db.prepare('DELETE FROM segments WHERE meeting_id = ?').run(meetingId)
+      for (const s of segs) {
+        const r = ins.run(meetingId, s.track, s.startMs, s.endMs, s.text, s.speaker, s.hidden ? 1 : 0, s.hidden && s.echoConfident ? 1 : 0)
+        if (s.hidden) this.db.prepare("INSERT INTO segments_fts(segments_fts, rowid, text) VALUES ('delete', ?, ?)").run(r.lastInsertRowid, s.text)
+      }
+      this.db.exec('COMMIT')
+    } catch (e) { this.db.exec('ROLLBACK'); throw e }
+  }
   /** the meeting's lines in order; hidden echo lines left out unless asked for */
   /** last: only the latest lines (the recorder's hover reads a recent tail, however long the meeting runs) */
   segments(meetingId: string, o: { hidden?: boolean; last?: number } = {}): Segment[] {

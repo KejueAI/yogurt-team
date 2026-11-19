@@ -9,6 +9,10 @@ export interface Config {
   secretKey: string
   openrouterApiKey?: string
   openrouterModel?: string
+  /** Kejue Inference (kejue-stt): end-of-meeting transcription, kept on the server so apps never hold it */
+  kejueApiKey?: string
+  kejueApiUrl: string
+  kejueSttModel: string
 }
 
 export function splitList(value: string | undefined): string[] {
@@ -39,6 +43,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     allowedDomains: splitList(env.ALLOWED_DOMAINS).map((d) => d.replace(/^@/, '')),
     openrouterApiKey: env.OPENROUTER_API_KEY?.trim() || undefined,
     openrouterModel: env.OPENROUTER_MODEL?.trim() || undefined,
+    kejueApiKey: env.KEJUE_API_KEY?.trim() || undefined,
+    kejueApiUrl: (env.KEJUE_API_URL?.trim() || 'https://api.kejue.co/v1').replace(/\/+$/, ''),
+    kejueSttModel: env.KEJUE_STT_MODEL?.trim() || 'kejue-stt',
   }
   if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
   if (config.secretKey.length < 32) throw new Error('SECRET_KEY must be at least 32 characters')

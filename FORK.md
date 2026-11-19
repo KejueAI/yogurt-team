@@ -9,8 +9,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 - `PLAN.md`, `FORK.md`
 - `.github/workflows/upstream-sync.yml`
 - `.github/actionlint.yaml` (Blacksmith runner labels)
-- `server/` (the team server: sign-in, Drive, admin page, summaries)
-- `app/src/main/team/` (desktop: sign-in, upload, OpenRouter summaries)
+- `server/` (the team server: sign-in, Drive, admin page, summaries, transcription proxy)
+- `app/src/main/team/` (desktop: sign-in, upload, OpenRouter summaries, end-of-meeting transcription through the team server)
 - `app/src/renderer/src/team/` (desktop UI for team features)
 - `app/native/yogurt-audio-win/src/mix.rs`, `app/native/yogurt-audio-linux/src/mix.rs` (the `mix` command: both tracks as one file for Drive)
 
@@ -19,7 +19,7 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | File | Change |
 |---|---|
 | `app/electron-builder.yml` | App ID `co.kejue.yogurtteam`, product name "Yogurt Team", update feed points at this repo, permission text no longer says "Nothing leaves your Mac", Windows executable name pinned to `Yogurt`, disk image title |
-| `app/src/main/index.ts` | `app.setName('Yogurt Team')`, Windows AppUserModelId; `hookTeam(...)` before `hookNotes`, whose `summarized` hands the meeting to the team upload queue (which runs upstream's recording deletion once the audio is uploaded); wraps the notes model with `createTeamNotes` (team/llm.ts) using `teamSession`, so the notes queue and Ask don't wait for a local model while the team server writes notes |
+| `app/src/main/index.ts` | `app.setName('Yogurt Team')`, Windows AppUserModelId; `hookTeam(...)` before `hookNotes`, whose `summarized` hands the meeting to the team upload queue (which runs upstream's recording deletion once the audio is uploaded); wraps the notes model with `createTeamNotes` (team/llm.ts) using `teamSession`, so the notes queue and Ask don't wait for a local model while the team server writes notes; the three `transcribed` hooks (call names, read-ahead, notes) also await `teamTranscribed(id)` (team/stt.ts replaces Whisper's lines with the team transcription service's) |
 | `app/src/main/paths.ts` | Data folder `Yogurt Team` |
 | `app/test/paths.test.ts` | Expects the `Yogurt Team` data folder |
 | `app/scripts/release-mac.sh` | Checks the new bundle identifier and the `Yogurt Team.app` path |
@@ -30,7 +30,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 | `app/src/renderer/src/screens/Note.tsx` | `<TeamMeeting />` private toggle and upload status in the note's metadata row; `<TeamSignInNeeded />` above a summary waiting on sign-in |
 | `app/native/yogurt-audio/main.swift` | `mix --out FILE IN...` block before the command guard (Mac side of the one-file recording) |
 | `app/native/yogurt-audio-win/src/main.rs`, `app/native/yogurt-audio-linux/src/main.rs` | `mod mix` and the `"mix"` match arm |
-| `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts`, `llm.ts` |
+| `app/test/catalog.test.ts` | Network allowlist includes `main/team/api.ts`, `signIn.ts`, `uploads.ts`, `llm.ts`, `stt.ts` |
+| `app/src/main/store.ts` | `replaceSegments(meetingId, segs)`: swaps a meeting's whole transcript in one transaction |
 | `app/src/main/notes/enhance.ts` | Optional `Llm.partTokens` so the cloud model (team/llm.ts) splits long meetings into bigger parts |
 | `app/src/main/setup.ts` | `remoteNotes` dep: when the team server writes notes, skip the notes model download (speech and embedding still download); `startLocalNotes()` resumes it |
 

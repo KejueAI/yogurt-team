@@ -50,6 +50,18 @@ The app `PUT`s each audio file's bytes straight to its `uploadUrl` (a Google res
 `POST /api/llm/chat` streams a chat completion through OpenRouter using the admin's key and model. Body: `{ messages: [{ role, content }], maxTokens?, temperature?, purpose: "summary" | "title" | "chat" | "other" }`. The response is `text/event-stream` with `data: {"delta":"..."}` lines and a final `data: {"done":true}`; an error mid-stream is `data: {"error":"..."}`.
 Returns `not_configured` when no key is set; the app then uses its local model.
 
+## Transcription (Kejue Inference)
+
+When `KEJUE_API_KEY` is set, `GET /api/me` has `team.transcriptionEnabled: true` and the app re-transcribes each finished meeting's `me` and `them` tracks separately (so lines stay You/Them without diarization), replacing the live Whisper transcript. The server only forwards the control calls; the app PUTs audio bytes straight to the presigned part URLs. Routes (bodies and replies are the Kejue API's own, see docs.kejue.co/inference/async-transcription):
+
+- `POST /api/stt/uploads` `{ filename, size_bytes, content_type }`
+- `POST /api/stt/uploads/:id/parts` `{ parts: [{ part_number, checksum_sha256 }] }` (1–4 per call)
+- `POST /api/stt/uploads/:id/complete`
+- `POST /api/stt/jobs` `{ upload_id, language: "en"|"ar"|"auto", timestamp_granularity: "none"|"chunk"|"word" }` (the server picks the model)
+- `GET /api/stt/jobs/:id`, `GET /api/stt/jobs/:id/result` (JSON), `DELETE /api/stt/jobs/:id`, `DELETE /api/stt/uploads/:id` (abort an upload that never became a job; it otherwise holds one of the workspace's upload slots for a day)
+
+POSTs pass the app's `Idempotency-Key` through. No key: `not_configured` 409; service unreachable: `upstream_error` 502.
+
 ## Admin (web, cookie session; admins only)
 
 Pages under `/admin`. Bootstrapped by `ADMIN_EMAILS` (comma-separated).
@@ -71,6 +83,8 @@ Pages under `/admin`. Bootstrapped by `ADMIN_EMAILS` (comma-separated).
 | `ALLOWED_DOMAINS` | Comma-separated, initial allowed sign-in domains (editable later) |
 | `SECRET_KEY` | 32+ random bytes; encrypts stored Google refresh tokens and the OpenRouter key; signs cookies |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Optional; the admin page can set them instead |
+| `KEJUE_API_KEY` | Optional; Kejue Inference key for end-of-meeting transcription (`kejue-stt`). Without it the apps keep their local Whisper transcript |
+| `KEJUE_API_URL`, `KEJUE_STT_MODEL` | Optional; default `https://api.kejue.co/v1` and `kejue-stt` |
 
 Redirect URIs to register on the OAuth client: `<PUBLIC_URL>/auth/google/callback` (sign-in) and `<PUBLIC_URL>/auth/drive/callback` (admin Drive connect).
 

@@ -153,6 +153,10 @@ export class TeamSession {
     if (server && token) await teamApi(server, token, this.d.fetch).signOut().catch(e => console.warn('[team] sign-out on the server failed', e))
   }
 
+  /** team.transcriptionEnabled from /api/me; false when signed out, unknown, or an older server */
+  async transcriptionEnabled(): Promise<boolean> {
+    return (await this.me().catch(() => undefined))?.team.transcriptionEnabled === true
+  }
   /** team.summariesEnabled from /api/me (cached for a minute); false when signed out or unknown */
   async summariesEnabled(): Promise<boolean> {
     return (await this.me().catch(() => undefined))?.team.summariesEnabled === true

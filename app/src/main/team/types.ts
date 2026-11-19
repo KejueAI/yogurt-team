@@ -7,6 +7,8 @@
 export type TeamUser = { email: string; name: string; picture?: string | null; isAdmin: boolean }
 export type TeamConfig = {
   name: string; driveConnected: boolean; summariesEnabled: boolean
+  /** the server transcribes finished recordings (Kejue Inference); optional for older servers */
+  transcriptionEnabled?: boolean
   uploadAudio: boolean; uploadTranscript: boolean; uploadNotes: boolean; graceMinutes: number
 }
 export type TeamMe = { user: TeamUser; team: TeamConfig }

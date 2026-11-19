@@ -13,6 +13,7 @@ import {
   uploadRequestSchema,
 } from '../uploads.js'
 import { USER_COLUMNS, toUser } from '../auth.js'
+import { mountStt } from '../stt.js'
 
 async function readJson<T>(c: Context, schema: ZodType<T>): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
   let body: unknown
@@ -82,6 +83,7 @@ export function apiRoutes(deps: Deps): Hono<Env> {
         name: settings.teamName,
         driveConnected: !!refreshToken && !!settings.driveFolder,
         summariesEnabled: !!openrouter.key,
+        transcriptionEnabled: !!deps.config.kejueApiKey,
         uploadAudio: settings.uploadAudio,
         uploadTranscript: settings.uploadTranscript,
         uploadNotes: settings.uploadNotes,
@@ -128,6 +130,8 @@ export function apiRoutes(deps: Deps): Hono<Env> {
       return uploadErrorResponse(c, err)
     }
   })
+
+  mountStt(authed, deps.config, deps.fetchImpl)
 
   authed.post('/llm/chat', async (c) => {
     const body = await readJson(c, chatRequestSchema)
