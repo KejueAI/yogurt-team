@@ -180,7 +180,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ls -la files
-          gh release create "${{ github.ref_name }}" files/* --repo "${{ github.repository }}" --title "Yogurt ${GITHUB_REF_NAME#v}" --generate-notes --latest
+          gh release create "${{ github.ref_name }}" files/* --repo "${{ github.repository }}" --title "Yogurt Team ${GITHUB_REF_NAME#v}" --generate-notes --latest
 
   # a draft with a Mac built by hand gets the Windows and Linux files; it stays a draft
   draft:

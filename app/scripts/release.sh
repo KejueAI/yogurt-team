@@ -37,7 +37,7 @@ j.version = process.argv[1]; fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\
 ' "$VERSION"
 
 if [ "$MODE" != --mac-local ]; then
-  git commit -qm "Yogurt $VERSION" app/package.json
+  git commit -qm "Yogurt Team $VERSION" app/package.json
   git tag "v$VERSION"
   git push -q origin main "v$VERSION"
   echo "Building Yogurt $VERSION: $REPO_URL/actions/workflows/release.yml"
@@ -57,7 +57,7 @@ D=app/dist
 xcrun stapler validate "$D/Yogurt-mac-arm64.dmg"
 codesign -dv "$D/mac-arm64/Yogurt.app" 2>&1 | grep -q 'TeamIdentifier=2JNSQVN3N8' || { echo "the app isn't signed with the Developer ID" >&2; exit 1; }
 trap - EXIT
-git commit -qm "Yogurt $VERSION" app/package.json
+git commit -qm "Yogurt Team $VERSION" app/package.json
 git push -q origin main
 SHA=$(git rev-parse HEAD)
 gh release create "v$VERSION" --draft --target "$SHA" --title "Yogurt $VERSION" --generate-notes \
