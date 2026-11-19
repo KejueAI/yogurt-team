@@ -43,7 +43,8 @@ To keep merges painless, fork code lives in its own files and folders. When a me
 ## Merge rules
 
 - Never take upstream's version of the lines above; re-apply the fork's values.
-- `app/package.json` keeps upstream's version with a `-team.N` suffix.
+- `app/package.json` keeps a plain `X.Y.Z` version at or above upstream's (a `-team.N` suffix would read as a pre-release, which installed copies skip). Release the fork with `sh app/scripts/release.sh X.Y.Z`, bumping the patch number past upstream's.
+- Upstream's own version tags arrive with merges; never push them (`git push --tags`), since a tag push starts a release.
 
 ## Linux runners
 
