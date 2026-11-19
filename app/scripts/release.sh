@@ -20,6 +20,8 @@ echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "usage: sh app/s
 git pull -q --ff-only
 # the repository origin points at, so links and gh follow it
 REPO_URL=$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#; s#\.git$##')
+# yogurt-team: gh asks this repo, not upstream (a fork's gh otherwise defaults to the parent)
+export GH_REPO="${REPO_URL#https://github.com/}"
 git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && { echo "v$VERSION already exists" >&2; exit 1; }
 # a release always moves forward, so installed copies see it as an update
 node -e '
